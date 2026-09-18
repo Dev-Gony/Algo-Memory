@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  catalog:
+    name: 문제 템플릿 실행 검증
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: 70개 템플릿 실행
+        run: python3 content/catalog3.py
+      - name: 생성된 catalog.json 이 커밋본과 같은지
+        run: git diff --exit-code src/catalog.json
+
+  app:
+    name: 빌드 + 종단 테스트
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm install --no-audit --no-fund
+      - run: npm test
