@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Algo-Memory · 알고리즘 통암기 스케줄러</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!--DEV--><link rel="stylesheet" href="styles.css"><!--/DEV-->
+<!--INJECT:STYLES-->
+</head>
+<body>
+
+<header>
+  <div class="hbar">
+    <button class="iconbtn" id="backBtn" data-act="back" title="뒤로" aria-label="뒤로" hidden>←</button>
+    <div class="brand">
+      <span class="dot"></span>
+      <span>Algo-Memory<small>ebbinghaus drill</small></span>
+    </div>
+    <span class="hspace"></span>
+    <span class="today mono" id="todayLabel"></span>
+    <button class="iconbtn" id="themeBtn" title="테마 전환" aria-label="테마 전환">◐</button>
+  </div>
+  <nav id="nav">
+    <button data-v="dash" aria-current="true">대시보드<span class="badge" id="navDue" hidden>0</span></button>
+    <button data-v="pack">코스</button>
+    <button data-v="bank">문제 은행</button>
+    <button data-v="books">독서 · 인사이트</button>
+    <button data-v="stats">통계</button>
+    <button data-v="settings">설정</button>
+  </nav>
+</header>
+
+<main>
+  <section class="view on" id="v-dash"></section>
+  <section class="view" id="v-pack"></section>
+  <section class="view" id="v-bank"></section>
+  <section class="view" id="v-test"></section>
+  <section class="view" id="v-drill"></section>
+  <section class="view" id="v-books"></section>
+  <section class="view" id="v-stats"></section>
+  <section class="view" id="v-settings"></section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!--DEV--><script src="app.js"></script><!--/DEV-->
+<!--INJECT:SCRIPT-->
+</body>
+</html>
