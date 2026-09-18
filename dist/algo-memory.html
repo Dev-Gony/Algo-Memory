@@ -1,0 +1,2442 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Algo-Memory · 알고리즘 통암기 스케줄러</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f2ec;
+  --panel:#fffefb;
+  --panel-2:#f9f7f1;
+  --line:#e2ded2;
+  --line-2:#d2ccbb;
+  --ink:#1a1916;
+  --ink-2:#56524a;
+  --ink-3:#8b857a;
+  --accent:#14755c;
+  --accent-soft:#dff0e8;
+  --warn:#a76a00;
+  --warn-soft:#fbeed3;
+  --bad:#b9382f;
+  --bad-soft:#fae2df;
+  --good:#14755c;
+  --shadow:0 1px 2px rgba(26,25,22,.05), 0 8px 24px -16px rgba(26,25,22,.25);
+  --r:14px;
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans:"IBM Plex Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111316;
+    --panel:#1a1d21;
+    --panel-2:#212529;
+    --line:#2c3138;
+    --line-2:#3a4048;
+    --ink:#eceae4;
+    --ink-2:#a8a49b;
+    --ink-3:#797569;
+    --accent:#4ed4a6;
+    --accent-soft:#16342a;
+    --warn:#e0a94a;
+    --warn-soft:#3a2f18;
+    --bad:#f0736a;
+    --bad-soft:#3a1f1d;
+    --good:#4ed4a6;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111316;
+  --panel:#1a1d21;
+  --panel-2:#212529;
+  --line:#2c3138;
+  --line-2:#3a4048;
+  --ink:#eceae4;
+  --ink-2:#a8a49b;
+  --ink-3:#797569;
+  --accent:#4ed4a6;
+  --accent-soft:#16342a;
+  --warn:#e0a94a;
+  --warn-soft:#3a2f18;
+  --bad:#f0736a;
+  --bad-soft:#3a1f1d;
+  --good:#4ed4a6;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px -18px rgba(0,0,0,.9);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:var(--sans); font-size:15px; line-height:1.6;
+  -webkit-text-size-adjust:100%;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+p{margin:0}
+a{color:var(--accent)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- header ---------- */
+header{
+  position:sticky; top:0; z-index:40;
+  background:color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter:saturate(180%) blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.hbar{max-width:1120px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;gap:14px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:-.02em;white-space:nowrap}
+.brand .dot{width:10px;height:10px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.brand small{font-family:var(--mono);font-size:10px;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;display:block;line-height:1}
+.hspace{flex:1}
+.today{font-family:var(--mono);font-size:12px;color:var(--ink-3);white-space:nowrap}
+.iconbtn{
+  border:1px solid var(--line); background:var(--panel); border-radius:9px;
+  width:32px;height:32px;display:grid;place-items:center;cursor:pointer;font-size:14px;
+}
+.iconbtn:hover{border-color:var(--line-2)}
+nav{max-width:1120px;margin:0 auto;padding:0 18px 8px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{
+  border:none;background:none;cursor:pointer;padding:7px 12px;border-radius:9px;
+  color:var(--ink-2);font-size:13.5px;font-weight:500;white-space:nowrap;position:relative;
+}
+nav button:hover{background:var(--panel-2);color:var(--ink)}
+nav button[aria-current="true"]{background:var(--ink);color:var(--bg)}
+nav .badge{
+  display:inline-block;min-width:17px;padding:0 4px;margin-left:6px;border-radius:20px;
+  background:var(--bad);color:#fff;font-family:var(--mono);font-size:10.5px;line-height:17px;text-align:center;
+}
+nav button[aria-current="true"] .badge{background:var(--bg);color:var(--ink)}
+
+main{max-width:1120px;margin:0 auto;padding:22px 18px 80px}
+.view{display:none}
+.view.on{display:block}
+
+/* ---------- primitives ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.pad{padding:18px}
+.sect-h{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.sect-h h2{font-size:16px}
+.sect-h .sub{font-size:12.5px;color:var(--ink-3)}
+.grow{flex:1}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--ink-3)}
+.small{font-size:12.5px}
+hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
+
+.btn{
+  border:1px solid var(--line-2); background:var(--panel); color:var(--ink);
+  padding:8px 14px;border-radius:10px;cursor:pointer;font-size:13.5px;font-weight:500;
+  transition:transform .06s ease, background .15s ease;
+}
+.btn:hover{background:var(--panel-2)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.primary:hover{opacity:.88;background:var(--ink)}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--ink-2)}
+.btn.ghost:hover{background:var(--panel-2);color:var(--ink)}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:8px}
+.btn.danger{color:var(--bad);border-color:var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+label.f{display:block;margin-bottom:12px}
+label.f > span{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin-bottom:5px}
+input[type=text],input[type=url],input[type=number],input[type=date],select,textarea{
+  width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
+  padding:9px 11px;outline:none;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);background:var(--panel)}
+textarea{resize:vertical;min-height:90px}
+textarea.code{font-family:var(--mono);font-size:13px;line-height:1.65;min-height:180px;white-space:pre;overflow-wrap:normal;overflow-x:auto}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.f3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 14px}
+
+.chip{
+  display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;
+  background:var(--panel-2);border:1px solid var(--line);font-size:11.5px;font-weight:500;color:var(--ink-2);
+  white-space:nowrap;
+}
+.chip.accent{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.chip.warn{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+.chip.bad{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.chip.mono{font-family:var(--mono)}
+
+/* ---------- dashboard ---------- */
+.today-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin-bottom:20px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.tile .lab{font-size:12px;color:var(--ink-3);font-weight:500;letter-spacing:.01em}
+.tile .big{font-family:var(--mono);font-size:32px;font-weight:600;line-height:1.1;margin-top:6px;letter-spacing:-.02em}
+.tile .big em{font-style:normal;font-size:15px;color:var(--ink-3);font-weight:400;margin-left:3px}
+.tile .note{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.bar{height:5px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:11px}
+.bar > i{display:block;height:100%;background:var(--accent);border-radius:5px;transition:width .4s ease}
+.bar.warn > i{background:var(--warn)}
+.bar.bad > i{background:var(--bad)}
+
+.qlist{display:flex;flex-direction:column;gap:9px}
+.qrow{
+  display:flex;align-items:center;gap:12px;padding:13px 15px;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+}
+.qrow.over{border-color:color-mix(in srgb, var(--bad) 40%, var(--line))}
+.qrow .meta{min-width:0;flex:1}
+.qrow .ttl{font-weight:500;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qrow .sub{font-size:12px;color:var(--ink-3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rounds{display:flex;gap:3px}
+.rounds i{width:7px;height:7px;border-radius:50%;background:var(--line-2);display:block}
+.rounds i.done{background:var(--accent)}
+.rounds i.now{background:var(--warn);box-shadow:0 0 0 2px var(--warn-soft)}
+
+.empty{padding:34px 18px;text-align:center;color:var(--ink-3);font-size:13.5px}
+.empty .em{font-size:26px;display:block;margin-bottom:8px;opacity:.6}
+
+/* ---------- problem bank ---------- */
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filters input[type=text]{max-width:260px}
+.filters select{max-width:180px}
+.plist{display:flex;flex-direction:column;gap:8px}
+.prow{
+  display:flex;gap:12px;align-items:center;padding:12px 15px;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;cursor:pointer;box-shadow:var(--shadow);
+}
+.prow:hover{border-color:var(--line-2)}
+.prow .meta{flex:1;min-width:0}
+.rate{font-family:var(--mono);font-size:13px;font-weight:600;min-width:46px;text-align:right}
+.rate.g{color:var(--good)} .rate.w{color:var(--warn)} .rate.b{color:var(--bad)}
+
+.detail{margin-top:14px}
+.kv{display:grid;grid-template-columns:86px 1fr;gap:6px 14px;font-size:13.5px}
+.kv dt{color:var(--ink-3);font-size:12.5px}
+.kv dd{margin:0;min-width:0;word-break:break-word}
+pre.code{
+  font-family:var(--mono);font-size:12.8px;line-height:1.7;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:10px;padding:13px 14px;overflow-x:auto;margin:0;
+  white-space:pre;
+}
+.t-c{color:var(--ink-3);font-style:italic}
+.t-s{color:var(--warn)}
+.t-k{color:var(--accent);font-weight:500}
+.t-b{color:var(--ink-2)}
+.t-n{color:var(--bad)}
+
+/* ---------- test ---------- */
+.testhead{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.timer{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em}
+.hintbox{background:var(--panel-2);border:1px dashed var(--line-2);border-radius:10px;padding:11px 13px;font-size:13px;color:var(--ink-2);margin-bottom:12px}
+.editor-wrap{
+  display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel-2);
+}
+.editor-wrap:focus-within{border-color:var(--accent)}
+.gutter{
+  font-family:var(--mono);font-size:13px;line-height:1.7;padding:12px 8px 12px 12px;
+  color:var(--ink-3);text-align:right;background:transparent;user-select:none;overflow:hidden;
+  min-width:44px;white-space:pre;
+}
+#codeInput{
+  flex:1;border:none;border-radius:0;background:transparent;padding:12px 14px 12px 4px;
+  font-family:var(--mono);font-size:13px;line-height:1.7;min-height:340px;white-space:pre;
+  overflow-wrap:normal;overflow-x:auto;resize:vertical;
+}
+#codeInput:focus{background:transparent}
+.editbar{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:12px;color:var(--ink-3);flex-wrap:wrap}
+
+.score{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.score .num{font-family:var(--mono);font-size:52px;font-weight:600;line-height:1;letter-spacing:-.03em}
+.score .num em{font-style:normal;font-size:20px;color:var(--ink-3)}
+.verdict{font-size:13.5px;font-weight:500}
+.difflist{border:1px solid var(--line);border-radius:10px;overflow:hidden;font-family:var(--mono);font-size:12.6px;line-height:1.65}
+.dl{display:flex;gap:0;border-bottom:1px solid var(--line);background:var(--panel)}
+.dl:last-child{border-bottom:none}
+.dl .mk{width:26px;flex:none;text-align:center;color:var(--ink-3);background:var(--panel-2);border-right:1px solid var(--line);user-select:none}
+.dl .tx{padding:2px 10px;white-space:pre-wrap;word-break:break-word;flex:1;min-width:0}
+.dl.same .tx{color:var(--ink-2)}
+.dl.miss{background:var(--bad-soft)} .dl.miss .mk{color:var(--bad)}
+.dl.extra{background:var(--warn-soft)} .dl.extra .mk{color:var(--warn)}
+.dl mark{background:color-mix(in srgb, var(--bad) 28%, transparent);color:inherit;border-radius:3px;padding:0 1px}
+.dl.extra mark{background:color-mix(in srgb, var(--warn) 34%, transparent)}
+.ind{display:inline-block;color:var(--line-2)}
+
+.checklist{display:flex;flex-direction:column;gap:6px}
+.ck{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:6px 10px;border-radius:8px;background:var(--panel-2)}
+.ck .s{font-family:var(--mono);font-size:12px;flex:none;width:16px;text-align:center}
+.ck.ok{color:var(--ink-2)} .ck.ok .s{color:var(--good)}
+.ck.no{background:var(--bad-soft)} .ck.no .s{color:var(--bad)}
+
+.pk{padding:10px 0;border-bottom:1px solid var(--line)}
+.pk:last-child{border-bottom:none;padding-bottom:0}
+.pk.reg{opacity:.55}
+.pkck{
+  flex:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line-2);
+  display:grid;place-items:center;cursor:pointer;font-size:12px;margin-top:2px;background:var(--panel-2);
+  color:transparent;user-select:none;
+}
+.pkck:hover{border-color:var(--accent)}
+.pkck.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.pkck.done{background:var(--accent-soft);border-color:transparent;color:var(--accent);cursor:default}
+
+.hintbox.warn-ko{border-style:solid;border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+.tracebox{
+  position:relative;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);
+  overflow:auto;max-height:62vh;transition:border-color .12s ease, background .12s ease;
+}
+.tracebox:focus-within{border-color:var(--accent)}
+.tracebox.err{border-color:var(--bad);background:var(--bad-soft)}
+.traceview{
+  font-family:var(--mono);font-size:13.5px;line-height:1.8;padding:16px;white-space:pre;margin:0;
+  min-height:220px;
+}
+.traceview .done{color:var(--ink)}
+.traceview .ghost{color:var(--ink-3);opacity:.45}
+.traceview .cur{background:var(--accent);color:var(--bg);border-radius:2px;padding:0 1px}
+.traceview .cur.end{background:var(--good)}
+.tracein{
+  position:absolute;inset:0;width:100%;height:100%;opacity:0;resize:none;border:none;outline:none;
+  font-family:var(--mono);font-size:13.5px;line-height:1.8;padding:16px;white-space:pre;background:transparent;
+}
+.course{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;
+  box-shadow:var(--shadow);cursor:pointer;transition:border-color .15s ease;
+}
+.course:hover{border-color:var(--accent)}
+.course.done{border-color:color-mix(in srgb, var(--accent) 45%, var(--line))}
+.cnum{
+  flex:none;width:42px;height:42px;border-radius:11px;display:grid;place-items:center;
+  background:var(--panel-2);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--ink-2);
+}
+.course.done .cnum{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.lvtabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;scrollbar-width:none}
+.lvtabs::-webkit-scrollbar{display:none}
+.lvtab{
+  border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:7px 13px;
+  font-size:13px;font-weight:500;color:var(--ink-2);cursor:pointer;white-space:nowrap;
+}
+.lvtab:hover{border-color:var(--line-2);color:var(--ink)}
+.lvtab.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.lvtab .mono{opacity:.65;font-size:11.5px}
+
+.verdict-card{border-width:1.5px}
+.verdict-card.ok{border-color:var(--good)}
+.verdict-card.no{border-color:var(--bad)}
+.stamp{
+  flex:none;width:76px;height:76px;border-radius:50%;display:grid;place-items:center;text-align:center;
+  font-weight:700;font-size:15px;line-height:1.15;letter-spacing:-.02em;transform:rotate(-8deg);
+}
+.stamp.ok{border:3px solid var(--good);color:var(--good)}
+.stamp.no{border:3px dashed var(--bad);color:var(--bad)}
+
+.gate{border-color:var(--bad);border-width:1.5px}
+body.gated nav button:not([data-v="dash"]){opacity:.35;pointer-events:none}
+
+/* ---------- books ---------- */
+.bookgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.book{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px;box-shadow:var(--shadow)}
+.ins{border-left:2px solid var(--accent);padding:2px 0 2px 13px;margin-bottom:14px}
+.ins .q{font-size:14px;line-height:1.65;white-space:pre-wrap}
+.ins .m{font-size:11.5px;color:var(--ink-3);margin-top:5px;font-family:var(--mono)}
+
+/* ---------- stats ---------- */
+.chart{display:flex;align-items:flex-end;gap:5px;height:130px;padding-top:10px}
+.chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.chart .stack{width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center}
+.chart .b{width:72%;max-width:26px;border-radius:4px 4px 2px 2px;background:var(--accent);min-height:2px;position:relative}
+.chart .b.part{background:var(--warn)}
+.chart .b.zero{background:var(--line);min-height:2px}
+.chart .cl{font-size:9.5px;color:var(--ink-3);font-family:var(--mono);white-space:nowrap}
+.hbars{display:flex;flex-direction:column;gap:9px}
+.hb{display:grid;grid-template-columns:96px 1fr 46px;gap:10px;align-items:center;font-size:12.5px}
+.hb .track{height:8px;background:var(--line);border-radius:6px;overflow:hidden}
+.hb .track > i{display:block;height:100%;background:var(--accent);border-radius:6px}
+.hb .track > i.w{background:var(--warn)}
+.hb .track > i.b{background:var(--bad)}
+.hb .v{font-family:var(--mono);text-align:right;color:var(--ink-2)}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+
+/* ---------- misc ---------- */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(14px);
+  background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:11px;font-size:13.5px;
+  opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;z-index:90;max-width:90vw;
+  box-shadow:0 10px 30px -10px rgba(0,0,0,.4);
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.scroller{overflow-x:auto}
+details.fold > summary{cursor:pointer;font-size:13px;color:var(--ink-2);font-weight:500;list-style:none;padding:4px 0}
+details.fold > summary::-webkit-details-marker{display:none}
+details.fold > summary::before{content:"▸ ";color:var(--ink-3)}
+details.fold[open] > summary::before{content:"▾ "}
+.stack-g{display:flex;flex-direction:column;gap:14px}
+
+@media (max-width:760px){
+  .today-strip{grid-template-columns:1fr;gap:9px}
+  .tile{display:flex;align-items:baseline;gap:12px;padding:14px 15px}
+  .tile .lab{flex:1}
+  .tile .big{margin-top:0;font-size:24px}
+  .tile .bar{position:absolute;left:0;right:0;bottom:0;margin:0;border-radius:0;height:3px}
+  .tile .note{display:none}
+  .f2,.f3{grid-template-columns:1fr}
+  .qrow{flex-wrap:wrap}
+  .kv{grid-template-columns:1fr;gap:2px 0}
+  .kv dt{margin-top:8px}
+  .hb{grid-template-columns:76px 1fr 42px;font-size:12px}
+  main{padding:16px 13px 70px}
+  .hbar{padding:10px 13px}
+  nav{padding:0 13px 8px}
+  .score .num{font-size:40px}
+  .stamp{width:62px;height:62px;font-size:13px}
+  .f3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hbar">
+    <button class="iconbtn" id="backBtn" data-act="back" title="뒤로" aria-label="뒤로" hidden>←</button>
+    <div class="brand">
+      <span class="dot"></span>
+      <span>Algo-Memory<small>ebbinghaus drill</small></span>
+    </div>
+    <span class="hspace"></span>
+    <span class="today mono" id="todayLabel"></span>
+    <button class="iconbtn" id="themeBtn" title="테마 전환" aria-label="테마 전환">◐</button>
+  </div>
+  <nav id="nav">
+    <button data-v="dash" aria-current="true">대시보드<span class="badge" id="navDue" hidden>0</span></button>
+    <button data-v="pack">코스</button>
+    <button data-v="bank">문제 은행</button>
+    <button data-v="books">독서 · 인사이트</button>
+    <button data-v="stats">통계</button>
+    <button data-v="settings">설정</button>
+  </nav>
+</header>
+
+<main>
+  <section class="view on" id="v-dash"></section>
+  <section class="view" id="v-pack"></section>
+  <section class="view" id="v-bank"></section>
+  <section class="view" id="v-test"></section>
+  <section class="view" id="v-drill"></section>
+  <section class="view" id="v-books"></section>
+  <section class="view" id="v-stats"></section>
+  <section class="view" id="v-settings"></section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+'use strict';
+
+/* ============ utils ============ */
+var $ = function (s) { return document.querySelector(s); };
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function pad(n) { return String(n).padStart(2, '0'); }
+function dstr(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function today() { return dstr(new Date()); }
+function addDays(ds, n) {
+  var p = ds.split('-').map(Number), dt = new Date(p[0], p[1] - 1, p[2]);
+  dt.setDate(dt.getDate() + n); return dstr(dt);
+}
+function dayDiff(a, b) {
+  var x = a.split('-').map(Number), y = b.split('-').map(Number);
+  return Math.round((Date.UTC(y[0], y[1] - 1, y[2]) - Date.UTC(x[0], x[1] - 1, x[2])) / 86400000);
+}
+function relDate(ds) {
+  var d = dayDiff(today(), ds);
+  if (d === 0) return '오늘'; if (d === 1) return '내일'; if (d === -1) return '어제';
+  if (d < 0) return Math.abs(d) + '일 지남';
+  return ds.slice(5).replace('-', '/');
+}
+function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+function toast(msg) {
+  var t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('on'); }, 2200);
+}
+function val(id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; }
+function num(id, dflt) { var v = parseInt(val(id), 10); return isNaN(v) ? (dflt || 0) : v; }
+
+var CATS = ['구현', '완전탐색', 'DFS', 'BFS', '백트래킹', '이분탐색', '투포인터', '정렬', '그리디',
+  'DP', '그래프', '최단경로', '최소신장트리', '분리집합', '문자열', '자료구조', '수학', '비트마스킹', '트리', '우선순위큐'];
+var LANGS = ['python', 'java', 'cpp', 'javascript', 'kotlin'];
+var LANG_LABEL = { python: 'Python', java: 'Java', cpp: 'C++', javascript: 'JavaScript', kotlin: 'Kotlin' };
+
+/* ============ state ============ */
+var CATALOG = [{"id":"s0-var","cat":"기초 문법","title":"변수와 출력","brief":"값을 이름에 담고 화면에 찍는다.","limits":"제일 처음 외울 3줄","logic":"= 는 '같다'가 아니라 오른쪽 값을 왼쪽 이름에 넣으라는 뜻이다. print에 쉼표로 여러 개를 넘기면 사이에 한 칸이 저절로 들어간다.","code":"name = \"gony\"\nage = 35\nscore = 92.5\n\nprint(name)\nprint(age, score)\nprint(\"name:\", name)","lv":1},{"id":"s0-math","cat":"기초 문법","title":"사칙연산과 나머지","brief":"더하기 빼기 곱하기 나누기, 그리고 몫과 나머지.","limits":"% 와 // 를 구분하는 게 전부","logic":"/ 는 소수점까지 나오는 나눗셈, // 는 몫만, % 는 나머지. 짝수 판별은 % 2 == 0, 배수 판별은 % k == 0 이 전부다.","code":"a = 7\nb = 3\n\nprint(a + b)\nprint(a - b)\nprint(a * b)\nprint(a // b)\nprint(a % b)","lv":1},{"id":"s0-func","cat":"기초 문법","title":"함수 만들기","brief":"재료를 받아 결과를 돌려주는 상자를 만든다.","limits":"앞으로 나올 모든 코드의 껍데기","logic":"def 이름(재료): 로 시작하고 return 으로 결과를 돌려준다. return 을 안 쓰면 None이 나온다. 함수 안쪽은 반드시 네 칸 들여쓴다.","code":"def add(a, b):\n    return a + b\n\n\ndef greet(name):\n    return \"hi \" + name\n\n\nprint(add(2, 3))\nprint(greet(\"gony\"))","lv":1},{"id":"s0-if","cat":"기초 문법","title":"if 조건문","brief":"점수에 따라 등급을 돌려준다.","limits":"조건은 위에서부터 차례로 검사된다","logic":"처음 맞는 조건에서 멈추고 나머지는 보지 않는다. 그래서 90점 조건을 80점 조건보다 먼저 써야 한다. 조건 끝의 콜론과 들여쓰기가 첫 관문.","code":"def grade(score):\n    if score >= 90:\n        return \"A\"\n    elif score >= 80:\n        return \"B\"\n    else:\n        return \"C\"","lv":1},{"id":"s0-for","cat":"기초 문법","title":"for 반복문","brief":"정해진 횟수만큼 돌면서 값을 쌓는다.","limits":"range의 시작과 끝을 외운다","logic":"range(n)은 0부터 n-1까지다. 1부터 n까지 돌리려면 range(1, n + 1)로 써야 한다. 이 한 칸 차이가 초보 때 제일 많이 틀리는 자리.","code":"def sum_to(n):\n    total = 0\n    for i in range(1, n + 1):\n        total += i\n    return total\n\n\ndef repeat(word, n):\n    for i in range(n):\n        print(i, word)","lv":1},{"id":"s0-while","cat":"기초 문법","title":"while 반복문","brief":"조건이 참인 동안 계속 돈다.","limits":"멈추는 줄을 빠뜨리면 무한 루프","logic":"횟수를 미리 알면 for, 조건으로 멈춰야 하면 while. 루프 안에서 조건에 쓰는 값을 반드시 바꿔줘야 끝난다.","code":"def count_down(n):\n    result = []\n    while n > 0:\n        result.append(n)\n        n -= 1\n    return result","lv":1},{"id":"s0-loopif","cat":"기초 문법","title":"반복문 안의 조건문","brief":"여러 값 중 조건에 맞는 것만 골라낸다.","limits":"for 와 if 를 겹쳐 쓰는 첫 연습","logic":"빈 그릇을 루프 밖에서 먼저 만든다. 루프 안에서 만들면 매번 비워져서 마지막 하나만 남는다. 이게 초보 단계 최다 실수.","code":"def even_numbers(n):\n    result = []\n    for i in range(1, n + 1):\n        if i % 2 == 0:\n            result.append(i)\n    return result\n\n\ndef count_multiples(nums, k):\n    count = 0\n    for x in nums:\n        if x % k == 0:\n            count += 1\n    return count","lv":1},{"id":"s0-list","cat":"기초 자료형","title":"리스트 기본","brief":"값 여러 개를 한 줄에 담고 꺼낸다.","limits":"번호는 0부터, 뒤에서는 -1","logic":"슬라이싱 [1:3] 은 1번부터 3번 '앞'까지라 3번은 안 들어온다. 끝 번호를 포함하지 않는다는 게 파이썬의 일관된 규칙.","code":"def list_basics():\n    nums = [10, 20, 30]\n    nums.append(40)\n    first = nums[0]\n    last = nums[-1]\n    part = nums[1:3]\n    size = len(nums)\n    return nums, first, last, part, size","lv":1},{"id":"s0-listsum","cat":"기초 자료형","title":"리스트 훑으며 합과 개수","brief":"전부 더하고, 조건에 맞는 것을 세고, 평균을 낸다.","limits":"N ≤ 1,000,000","logic":"합을 담을 그릇을 0으로 두고 루프 안에서 더한다. total = 0 을 루프 안에 쓰면 매번 초기화돼서 마지막 값만 남는다.","code":"def summarize(nums):\n    total = 0\n    count = 0\n    for x in nums:\n        total += x\n        if x > 0:\n            count += 1\n    average = total / len(nums)\n    return total, count, average","lv":1},{"id":"s0-str","cat":"기초 자료형","title":"문자열 꺼내 쓰기","brief":"글자 하나, 뒷글자, 일부분, 길이, 대문자.","limits":"리스트와 꺼내는 방법이 똑같다","logic":"문자열도 리스트처럼 번호로 꺼낸다. 다만 s[0] = 'x' 처럼 바꾸는 건 안 된다. 바꾸려면 새 문자열을 만들어야 한다.","code":"def string_intro(s):\n    first = s[0]\n    last = s[-1]\n    part = s[1:4]\n    length = len(s)\n    upper = s.upper()\n    return first, last, part, length, upper","lv":1},{"id":"s0-dict","cat":"기초 자료형","title":"딕셔너리 기본","brief":"번호 대신 이름표로 값을 꺼낸다.","limits":"없는 키를 꺼내면 에러가 난다","logic":"리스트는 번호로, 딕셔너리는 이름표로 꺼낸다. 없는 이름표를 [] 로 꺼내면 바로 에러라 in 으로 먼저 확인하거나 .get() 을 쓴다.","code":"def dict_basics():\n    ages = {\"ann\": 35, \"bob\": 28}\n    ages[\"cara\"] = 22\n    ann = ages[\"ann\"]\n    has_bob = \"bob\" in ages\n    safe = ages.get(\"dave\", 0)\n    return ages, ann, has_bob, safe","lv":1},{"id":"s0-input","cat":"기초 입출력","title":"입력 받기","brief":"숫자 하나, 한 줄에 여러 수, 단어 목록을 읽는다.","limits":"입력이 적을 때 쓰는 기본형","logic":"input()은 무조건 글자로 들어온다. 숫자로 쓰려면 int()로 바꿔야 한다. 한 줄에 여러 개면 split()으로 쪼갠 뒤 map(int, ...)로 한꺼번에 바꾼다.","code":"def read_simple():\n    n = int(input())\n    a, b = map(int, input().split())\n    words = input().split()\n    return n, a, b, words","lv":1},{"id":"py-listcomp","cat":"파이썬 기본","title":"리스트 컴프리헨션","brief":"반복문으로 쓰던 리스트 만들기를 한 줄로 바꾼다.","limits":"가장 많이 쓰는 문법 / 손에 붙을 때까지","logic":"[식 for 변수 in 반복가능 if 조건] 순서. 조건이 먼저 걸러지고 식이 적용된다. 중첩은 바깥 for를 먼저 쓴다.","code":"def transform(nums):\n    squares = [x * x for x in nums]\n    evens = [x for x in nums if x % 2 == 0]\n    labeled = [(i, x) for i, x in enumerate(nums)]\n    return squares, evens, labeled","lv":2},{"id":"py-count","cat":"파이썬 기본","title":"딕셔너리로 개수 세기","brief":"등장 횟수를 세고 가장 많이 나온 것을 찾는다.","limits":"해시 문제의 절반은 이걸로 풀린다","logic":"get(x, 0) + 1 패턴을 먼저 외우고, Counter는 그 축약형으로 쓴다. Counter는 없는 키를 조회해도 0을 돌려준다.","code":"from collections import Counter\n\n\ndef count_items(items):\n    counter = {}\n    for x in items:\n        counter[x] = counter.get(x, 0) + 1\n    return counter\n\n\ndef most_common(items, n):\n    return Counter(items).most_common(n)","lv":2},{"id":"py-string","cat":"파이썬 기본","title":"문자열 기본 조작","brief":"뒤집기, 자르기, 나누기, 붙이기, 치환.","limits":"길이 ≤ 100,000 / 슬라이싱은 O(N)","logic":"문자열은 바꿀 수 없으므로 모든 연산이 새 문자열을 만든다. 루프에서 += 로 이어붙이면 느려지니 list에 모아 join 한다.","code":"def string_basics(s):\n    reversed_s = s[::-1]\n    words = s.split()\n    joined = \"-\".join(words)\n    no_space = s.replace(\" \", \"\")\n    head, tail = s[:3], s[-3:]\n    return reversed_s, words, joined, no_space, head, tail\n\n\ndef build_fast(chars):\n    parts = []\n    for ch in chars:\n        parts.append(ch.upper())\n    return \"\".join(parts)","lv":2},{"id":"py-enumerate","cat":"파이썬 기본","title":"enumerate와 zip","brief":"인덱스와 값을 함께, 두 리스트를 나란히 순회한다.","limits":"range(len(x)) 대신 쓰는 습관을 들인다","logic":"enumerate(arr, start=1)로 번호를 1부터 시작할 수 있다. zip은 짧은 쪽에 맞춰 잘리므로 길이가 다르면 손실이 난다.","code":"def pair_up(names, scores):\n    result = []\n    for rank, (name, score) in enumerate(zip(names, scores), start=1):\n        result.append((rank, name, score))\n    return result\n\n\ndef unzip(pairs):\n    lefts, rights = zip(*pairs)\n    return list(lefts), list(rights)","lv":2},{"id":"py-grid","cat":"파이썬 기본","title":"2차원 리스트 만들기","brief":"N×M 격자를 만들고 순회하고 뒤집는다.","limits":"N, M ≤ 1000","logic":"[[0] * m] * n 은 같은 행을 n번 참조해서 한 칸만 바꿔도 전부 바뀐다. 반드시 for 문으로 새 행을 만든다.","code":"def make_grid(n, m):\n    grid = [[0] * m for _ in range(n)]\n    for r in range(n):\n        for c in range(m):\n            grid[r][c] = r * m + c\n    return grid\n\n\ndef transpose(grid):\n    return [list(row) for row in zip(*grid)]","lv":2},{"id":"py-minmax","cat":"파이썬 기본","title":"최댓값과 그 위치","brief":"가장 큰 값, 그 인덱스, 상위 K개를 구한다.","limits":"N ≤ 1,000,000 / 시간 O(N)","logic":"max(arr)로 값만 얻고 index()로 위치를 또 찾으면 두 번 훑는다. 한 번에 갱신하는 루프를 외운다.","code":"def max_with_index(nums):\n    best = 0\n    for i in range(1, len(nums)):\n        if nums[i] > nums[best]:\n            best = i\n    return nums[best], best\n\n\ndef top_k(nums, k):\n    return sorted(nums, reverse=True)[:k]","lv":2},{"id":"py-sortbasic","cat":"파이썬 기본","title":"정렬 기본기","brief":"오름·내림차순, 길이순, 람다 키, 제자리 정렬의 차이.","limits":"N ≤ 1,000,000 / 시간 O(N log N)","logic":"sorted는 새 리스트를 돌려주고 .sort()는 제자리에서 바꾸며 None을 돌려준다. 이걸 헷갈려서 None이 튀어나오는 실수가 제일 잦다.","code":"def sort_basics(nums, words):\n    asc = sorted(nums)\n    desc = sorted(nums, reverse=True)\n    by_length = sorted(words, key=len)\n    by_last = sorted(words, key=lambda w: w[-1])\n    return asc, desc, by_length, by_last\n\n\ndef sort_in_place(nums):\n    nums.sort(reverse=True)\n    return nums","lv":2},{"id":"sort-key","cat":"정렬","title":"다중 조건 정렬","brief":"나이는 오름차순, 나이가 같으면 이름은 가입순(입력 순서) 유지.","limits":"N ≤ 100000 / 시간 O(N log N)","logic":"파이썬 sort는 안정 정렬이라 동점은 입력 순서가 보존된다. 점수 내림차순 + 이름 오름차순처럼 방향이 섞이면 숫자는 -x로 뒤집고 문자열은 그대로 둔 채 튜플로 묶는다.","code":"def sort_members(members):\n    return sorted(members, key=lambda x: x[0])\n\n\ndef sort_mixed(items):\n    return sorted(items, key=lambda x: (-x[1], x[0]))","lv":3},{"id":"py-divisor","cat":"파이썬 기본","title":"약수와 소수 판정","brief":"약수를 모두 구하고, 어떤 수가 소수인지 판정한다.","limits":"N ≤ 1,000,000,000 / 시간 O(√N)","logic":"i가 약수면 n//i도 약수다. 루프는 √N까지만 돌면 되고, i == n//i 인 제곱근은 한 번만 넣는다.","code":"def divisors(n):\n    res = []\n    i = 1\n    while i * i <= n:\n        if n % i == 0:\n            res.append(i)\n            if i != n // i:\n                res.append(n // i)\n        i += 1\n    return sorted(res)\n\n\ndef is_prime(n):\n    if n < 2:\n        return False\n    i = 2\n    while i * i <= n:\n        if n % i == 0:\n            return False\n        i += 1\n    return True","lv":3},{"id":"py-base","cat":"파이썬 기본","title":"진법 변환","brief":"10진수를 n진수 문자열로, n진수 문자열을 10진수로.","limits":"2 ≤ base ≤ 16","logic":"나머지를 앞에 붙이며 몫으로 내려간다. 0은 루프를 한 번도 안 도니 따로 처리한다. 반대 방향은 int(s, base) 한 줄.","code":"def to_base(n, base):\n    if n == 0:\n        return \"0\"\n    digits = \"0123456789ABCDEF\"\n    res = \"\"\n    while n > 0:\n        res = digits[n % base] + res\n        n //= base\n    return res\n\n\ndef from_base(s, base):\n    return int(s, base)","lv":3},{"id":"py-input","cat":"파이썬 기본","title":"입력 받기 기본형","brief":"개수, 한 줄 여러 수, 격자, 문자열 여러 줄을 읽는다.","limits":"입력 100,000줄 이상이면 반드시 readline","logic":"실제 제출에서는 파일 맨 위에 input = sys.stdin.readline 한 줄을 넣는다. readline은 개행이 붙어 오므로 문자열은 rstrip()이 필수.","code":"import sys\n\n\ndef read_input():\n    readline = sys.stdin.readline\n    n = int(readline())\n    nums = list(map(int, readline().split()))\n    grid = [list(map(int, readline().split())) for _ in range(n)]\n    words = [readline().rstrip() for _ in range(n)]\n    return n, nums, grid, words","lv":3},{"id":"lv-hash-pair","cat":"해시","title":"해시로 짝 안 맞는 하나 찾기","brief":"두 목록을 비교해 한쪽에만 있는 원소를 찾는다. 동명이인 있음.","limits":"N ≤ 100,000 / 시간 O(N)","logic":"정렬해서 비교하면 O(N log N), 카운터로 빼면 O(N). 중복이 있으니 set으로 풀면 틀린다.","code":"from collections import Counter\n\n\ndef find_missing(left, right):\n    counter = Counter(left)\n    for name in right:\n        counter[name] -= 1\n    for name, cnt in counter.items():\n        if cnt > 0:\n            return name\n    return \"\"","lv":3},{"id":"lv-double-loop","cat":"완전탐색","title":"이중 반복 완전탐색","brief":"모든 두 원소 쌍을 확인해 조건을 만족하는 최선을 찾는다.","limits":"N ≤ 2,000 / 시간 O(N²)","logic":"i < j 를 지키려고 안쪽 루프를 i+1부터 시작한다. N이 3,000을 넘어가면 이 방식은 버리고 정렬+투포인터로 바꾼다.","code":"def best_pair(nums, limit):\n    best = -1\n    for i in range(len(nums)):\n        for j in range(i + 1, len(nums)):\n            total = nums[i] + nums[j]\n            if total <= limit and total > best:\n                best = total\n    return best","lv":3},{"id":"lv-prefix","cat":"누적합","title":"누적합으로 구간 합","brief":"구간 합 질의가 여러 번 들어올 때 매번 더하지 않는다.","limits":"N, Q ≤ 100,000 / 전처리 O(N), 질의 O(1)","logic":"prefix[i+1] = prefix[i] + nums[i] 로 한 칸 밀어서 만든다. 구간 [l, r] 합은 prefix[r+1] - prefix[l]. 밀어놓는 이유가 l=0 예외를 없애기 위해서다.","code":"def build_prefix(nums):\n    prefix = [0] * (len(nums) + 1)\n    for i, x in enumerate(nums):\n        prefix[i + 1] = prefix[i] + x\n    return prefix\n\n\ndef range_sum(prefix, left, right):\n    return prefix[right + 1] - prefix[left]","lv":3},{"id":"lv-greedy-coin","cat":"그리디","title":"그리디 거스름돈","brief":"큰 단위부터 최대한 쓰며 금액을 맞춘다.","limits":"동전 ≤ 100 / 시간 O(N)","logic":"동전 단위가 서로 배수 관계일 때만 그리디가 최적이다. 아니면 DP(동전 교환)로 가야 한다. 이 구분이 함정.","code":"def make_change(amount, coins):\n    coins = sorted(coins, reverse=True)\n    used = []\n    for coin in coins:\n        cnt = amount // coin\n        if cnt:\n            used.append((coin, cnt))\n            amount -= coin * cnt\n    return used if amount == 0 else []","lv":3},{"id":"lv-greedy-meet","cat":"그리디","title":"최대 회의 개수","brief":"겹치지 않게 회의를 최대 몇 개 넣을 수 있는지.","limits":"N ≤ 100,000 / 시간 O(N log N)","logic":"끝나는 시간 기준 정렬이 핵심. 시작 시간으로 정렬하면 틀린다. 끝 시간이 같으면 시작 시간이 빠른 것을 앞에 둔다.","code":"def max_meetings(meetings):\n    meetings = sorted(meetings, key=lambda x: (x[1], x[0]))\n    count = 0\n    last_end = float(\"-inf\")\n    for start, end in meetings:\n        if start >= last_end:\n            count += 1\n            last_end = end\n    return count","lv":3},{"id":"lv-window-fixed","cat":"투포인터","title":"고정 길이 슬라이딩 윈도우","brief":"길이 K인 연속 구간 합의 최댓값.","limits":"N ≤ 1,000,000 / 시간 O(N)","logic":"매번 sum을 다시 부르면 O(NK)가 된다. 들어온 것을 더하고 나간 것을 빼는 한 줄이 전부.","code":"def max_window_sum(nums, k):\n    total = sum(nums[:k])\n    best = total\n    for i in range(k, len(nums)):\n        total += nums[i] - nums[i - k]\n        if total > best:\n            best = total\n    return best","lv":3},{"id":"lv-deque","cat":"자료구조","title":"덱으로 순환 처리","brief":"줄을 돌리거나, 정해진 간격으로 하나씩 빼낸다.","limits":"N ≤ 100,000 / 시간 O(N·K)","logic":"list.pop(0)는 O(N)이라 큐로 쓰면 안 된다. deque.rotate(-k)는 왼쪽으로 k칸, 양수는 오른쪽으로 민다.","code":"from collections import deque\n\n\ndef rotate_left(items, k):\n    q = deque(items)\n    q.rotate(-k)\n    return list(q)\n\n\ndef round_robin(items, step):\n    q = deque(items)\n    order = []\n    while q:\n        q.rotate(-(step - 1))\n        order.append(q.popleft())\n    return order","lv":3},{"id":"lv-set","cat":"해시","title":"집합 연산","brief":"교집합, 합집합, 차집합, 중복 제거.","limits":"N ≤ 1,000,000 / 시간 O(N)","logic":"set은 순서를 보장하지 않으므로 출력이 필요하면 sorted를 씌운다. in 검사가 리스트는 O(N), set은 O(1)인 게 핵심 이유.","code":"def set_ops(a, b):\n    sa, sb = set(a), set(b)\n    common = sorted(sa & sb)\n    merged = sorted(sa | sb)\n    only_a = sorted(sa - sb)\n    return common, merged, only_a, len(sa)","lv":3},{"id":"sim-rotate","cat":"구현","title":"2차원 배열 90도 회전","brief":"N×M 격자를 시계 방향으로 90도 돌린 결과를 반환한다.","limits":"N, M ≤ 1000 / 시간 O(NM)","logic":"zip(*grid[::-1])이 시계, zip(*grid)[::-1]이 반시계. 인덱스로 직접 쓸 때는 new[c][N-1-r] = grid[r][c].","code":"def rotate(grid):\n    n, m = len(grid), len(grid[0])\n    new = [[0] * n for _ in range(m)]\n    for r in range(n):\n        for c in range(m):\n            new[c][n - 1 - r] = grid[r][c]\n    return new","lv":4},{"id":"sim-spiral","cat":"구현","title":"나선형 채우기","brief":"N×N 격자를 바깥에서 안으로 돌며 1부터 N*N까지 채운다.","limits":"N ≤ 500 / 시간 O(N²)","logic":"방향 배열 4개를 순서대로 두고, 벽이나 이미 채운 칸을 만나면 방향을 한 칸 돌린다.","code":"def spiral(n):\n    grid = [[0] * n for _ in range(n)]\n    dr, dc = [0, 1, 0, -1], [1, 0, -1, 0]\n    r = c = d = 0\n    for v in range(1, n * n + 1):\n        grid[r][c] = v\n        nr, nc = r + dr[d], c + dc[d]\n        if not (0 <= nr < n and 0 <= nc < n) or grid[nr][nc]:\n            d = (d + 1) % 4\n            nr, nc = r + dr[d], c + dc[d]\n        r, c = nr, nc\n    return grid","lv":4},{"id":"bf-comb","cat":"완전탐색","title":"조합 완전탐색","brief":"N개 중 M개를 고르는 모든 경우를 사전순으로 만든다.","limits":"N ≤ 20 / 시간 O(C(N,M)·M)","logic":"시작 인덱스를 넘겨 중복을 막는다. 재귀 깊이 == 고른 개수.","code":"def combinations(arr, m):\n    res = []\n    path = []\n\n    def back(start):\n        if len(path) == m:\n            res.append(path[:])\n            return\n        for i in range(start, len(arr)):\n            path.append(arr[i])\n            back(i + 1)\n            path.pop()\n\n    back(0)\n    return res","lv":4},{"id":"bf-perm","cat":"완전탐색","title":"순열 완전탐색","brief":"N개 중 M개를 뽑아 나열하는 모든 순서를 만든다.","limits":"N ≤ 10 / 시간 O(P(N,M)·M)","logic":"used 배열로 이미 쓴 원소를 막는다. 조합과 달리 매번 0부터 훑는다.","code":"def permutations(arr, m):\n    res = []\n    path = []\n    used = [False] * len(arr)\n\n    def back():\n        if len(path) == m:\n            res.append(path[:])\n            return\n        for i in range(len(arr)):\n            if used[i]:\n                continue\n            used[i] = True\n            path.append(arr[i])\n            back()\n            path.pop()\n            used[i] = False\n\n    back()\n    return res","lv":4},{"id":"sort-count","cat":"정렬","title":"계수 정렬","brief":"값의 범위가 작은 대량의 수를 정렬한다.","limits":"N ≤ 10,000,000 / 값 ≤ 10,000 / 시간 O(N+K)","logic":"값 자체를 인덱스로 쓴다. 비교 정렬의 N log N 하한을 우회하는 유일한 경우.","code":"def counting_sort(arr, max_value):\n    count = [0] * (max_value + 1)\n    for x in arr:\n        count[x] += 1\n    res = []\n    for v in range(max_value + 1):\n        res.extend([v] * count[v])\n    return res","lv":4},{"id":"bs-basic","cat":"이분탐색","title":"이분탐색 기본형","brief":"정렬된 배열에서 target의 인덱스를 찾고 없으면 -1.","limits":"N ≤ 1,000,000 / 시간 O(log N)","logic":"while lo <= hi, mid = (lo+hi)//2. 경계 조건은 항상 lo <= hi와 hi = mid-1 / lo = mid+1 한 쌍으로 외운다.","code":"def binary_search(arr, target):\n    lo, hi = 0, len(arr) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if arr[mid] == target:\n            return mid\n        if arr[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1","lv":4},{"id":"tp-window","cat":"투포인터","title":"합이 S 이상인 최소 길이","brief":"양수 배열에서 부분합이 S 이상이 되는 가장 짧은 연속 구간의 길이.","limits":"N ≤ 100,000 / 시간 O(N)","logic":"오른쪽을 한 칸씩 늘려 합을 키우고, 조건을 만족하는 동안 왼쪽을 당겨 최솟값을 갱신한다. 양수 배열에서만 성립.","code":"def min_window(arr, s):\n    left = 0\n    total = 0\n    best = len(arr) + 1\n    for right in range(len(arr)):\n        total += arr[right]\n        while total >= s:\n            best = min(best, right - left + 1)\n            total -= arr[left]\n            left += 1\n    return best if best <= len(arr) else 0","lv":4},{"id":"tp-pair","cat":"투포인터","title":"두 수의 합","brief":"정렬된 배열에서 합이 정확히 target인 쌍의 개수.","limits":"N ≤ 100,000 / 시간 O(N log N)","logic":"양 끝에서 좁혀온다. 합이 작으면 왼쪽을 밀고 크면 오른쪽을 당긴다. 중복 값이 있으면 같은 값 묶음 개수를 곱한다.","code":"def count_pairs(arr, target):\n    arr = sorted(arr)\n    lo, hi = 0, len(arr) - 1\n    cnt = 0\n    while lo < hi:\n        total = arr[lo] + arr[hi]\n        if total == target:\n            cnt += 1\n            lo += 1\n            hi -= 1\n        elif total < target:\n            lo += 1\n        else:\n            hi -= 1\n    return cnt","lv":4},{"id":"st-bracket","cat":"자료구조","title":"괄호 유효성 검사","brief":"(), [], {} 가 올바르게 짝지어졌는지 판정한다.","limits":"길이 ≤ 100,000 / 시간 O(N)","logic":"여는 괄호는 push, 닫는 괄호는 top과 짝이 맞는지 확인 후 pop. 마지막에 스택이 비어야 참.","code":"def is_valid(s):\n    pair = {\")\": \"(\", \"]\": \"[\", \"}\": \"{\"}\n    stack = []\n    for ch in s:\n        if ch in \"([{\":\n            stack.append(ch)\n        elif ch in pair:\n            if not stack or stack[-1] != pair[ch]:\n                return False\n            stack.pop()\n    return not stack","lv":4},{"id":"dfs-cc","cat":"DFS","title":"연결 요소 개수와 크기","brief":"무방향 그래프에서 연결 요소의 개수와 각 크기를 구한다.","limits":"N ≤ 100,000 / 시간 O(N+E)","logic":"재귀 대신 스택으로 돌린다. 파이썬은 재귀 깊이 제한(기본 1000)에 걸리기 쉬워 반복형이 안전하다.","code":"def connected_components(n, graph):\n    visited = [False] * n\n    sizes = []\n    for s in range(n):\n        if visited[s]:\n            continue\n        visited[s] = True\n        stack = [s]\n        size = 0\n        while stack:\n            cur = stack.pop()\n            size += 1\n            for nxt in graph[cur]:\n                if not visited[nxt]:\n                    visited[nxt] = True\n                    stack.append(nxt)\n        sizes.append(size)\n    return len(sizes), sizes","lv":4},{"id":"bfs-grid","cat":"BFS","title":"격자 최단거리","brief":"0은 벽, 1은 길인 격자에서 (0,0)부터 (N-1,M-1)까지 최소 칸 수.","limits":"N, M ≤ 1000 / 시간 O(NM)","logic":"dist 배열 하나로 방문 표시와 거리를 동시에 관리한다. 큐에 넣을 때 방문 처리해야 중복 삽입이 없다.","code":"from collections import deque\n\n\ndef shortest_path(grid):\n    n, m = len(grid), len(grid[0])\n    dist = [[0] * m for _ in range(n)]\n    dr, dc = [-1, 1, 0, 0], [0, 0, -1, 1]\n    q = deque([(0, 0)])\n    dist[0][0] = 1\n    while q:\n        r, c = q.popleft()\n        if (r, c) == (n - 1, m - 1):\n            return dist[r][c]\n        for d in range(4):\n            nr, nc = r + dr[d], c + dc[d]\n            if 0 <= nr < n and 0 <= nc < m and grid[nr][nc] == 1 and dist[nr][nc] == 0:\n                dist[nr][nc] = dist[r][c] + 1\n                q.append((nr, nc))\n    return -1","lv":4},{"id":"bfs-multi","cat":"BFS","title":"다중 시작점 BFS","brief":"여러 시작점에서 동시에 퍼질 때 전부 채우는 데 걸리는 날짜. 못 채우면 -1.","limits":"N, M ≤ 1000 / 시간 O(NM)","logic":"시작점을 전부 큐에 미리 넣고 한 번만 BFS를 돌린다. 시작점마다 따로 돌리면 시간 초과.","code":"from collections import deque\n\n\ndef spread_days(grid):\n    n, m = len(grid), len(grid[0])\n    q = deque()\n    fresh = 0\n    for r in range(n):\n        for c in range(m):\n            if grid[r][c] == 1:\n                q.append((r, c, 0))\n            elif grid[r][c] == 0:\n                fresh += 1\n    dr, dc = [-1, 1, 0, 0], [0, 0, -1, 1]\n    days = 0\n    while q:\n        r, c, d = q.popleft()\n        days = d\n        for i in range(4):\n            nr, nc = r + dr[i], c + dc[i]\n            if 0 <= nr < n and 0 <= nc < m and grid[nr][nc] == 0:\n                grid[nr][nc] = 1\n                fresh -= 1\n                q.append((nr, nc, d + 1))\n    return days if fresh == 0 else -1","lv":4},{"id":"bt-subset","cat":"백트래킹","title":"부분수열의 합","brief":"수열에서 합이 S가 되는 부분수열의 개수 (공집합 제외).","limits":"N ≤ 20 / 시간 O(2^N)","logic":"각 원소마다 '쓴다 / 안 쓴다' 두 갈래로 내려간다. N이 40쯤 되면 반씩 나눠 푸는 meet-in-the-middle로 바꾼다.","code":"def count_subsets(arr, s):\n    n = len(arr)\n    count = 0\n\n    def back(i, total, picked):\n        nonlocal count\n        if i == n:\n            if picked and total == s:\n                count += 1\n            return\n        back(i + 1, total + arr[i], picked + 1)\n        back(i + 1, total, picked)\n\n    back(0, 0, 0)\n    return count","lv":4},{"id":"dp-stairs","cat":"DP","title":"계단 오르기 점화식","brief":"한 번에 1칸 또는 2칸 오를 때 N칸을 오르는 경우의 수.","limits":"N ≤ 1,000,000 / 시간 O(N)","logic":"dp[i] = dp[i-1] + dp[i-2]. 모든 선형 DP의 원형이다. 초기값 두 개를 먼저 못 박고 시작한다.","code":"def climb(n):\n    if n <= 2:\n        return n\n    dp = [0] * (n + 1)\n    dp[1], dp[2] = 1, 2\n    for i in range(3, n + 1):\n        dp[i] = dp[i - 1] + dp[i - 2]\n    return dp[n]","lv":4},{"id":"dp-coin","cat":"DP","title":"동전 교환","brief":"동전 종류가 주어질 때 금액 K를 만드는 최소 동전 개수. 불가능하면 -1.","limits":"K ≤ 10,000 / 시간 O(NK)","logic":"INF로 초기화하고 dp[0]=0. 개수 최소화는 정순 순회(무한 개 사용 가능). 경우의 수를 셀 땐 루프 순서가 반대다.","code":"def min_coins(coins, target):\n    INF = float(\"inf\")\n    dp = [INF] * (target + 1)\n    dp[0] = 0\n    for coin in coins:\n        for amount in range(coin, target + 1):\n            dp[amount] = min(dp[amount], dp[amount - coin] + 1)\n    return dp[target] if dp[target] != INF else -1","lv":4},{"id":"str-palin","cat":"문자열","title":"최장 팰린드롬 부분문자열","brief":"문자열에서 앞뒤가 같은 가장 긴 연속 구간.","limits":"길이 ≤ 2,000 / 시간 O(N²)","logic":"각 위치를 중심으로 양쪽으로 벌린다. 길이가 홀수인 경우와 짝수인 경우를 따로 돌려야 한다.","code":"def longest_palindrome(s):\n    best = \"\"\n\n    def expand(lo, hi):\n        while lo >= 0 and hi < len(s) and s[lo] == s[hi]:\n            lo -= 1\n            hi += 1\n        return s[lo + 1:hi]\n\n    for i in range(len(s)):\n        odd = expand(i, i)\n        even = expand(i, i + 1)\n        for cand in (odd, even):\n            if len(cand) > len(best):\n                best = cand\n    return best","lv":4},{"id":"math-sieve","cat":"수학","title":"에라토스테네스의 체","brief":"N 이하의 소수를 모두 구한다.","limits":"N ≤ 1,000,000 / 시간 O(N log log N)","logic":"i*i부터 지우기 시작하고 i는 √N까지만 본다. 슬라이스 대입으로 한 번에 지우면 훨씬 빠르다.","code":"def sieve(n):\n    is_prime = [True] * (n + 1)\n    is_prime[0] = is_prime[1] = False\n    i = 2\n    while i * i <= n:\n        if is_prime[i]:\n            is_prime[i * i::i] = [False] * len(is_prime[i * i::i])\n        i += 1\n    return [x for x in range(2, n + 1) if is_prime[x]]","lv":4},{"id":"math-gcd","cat":"수학","title":"GCD · 빠른 거듭제곱","brief":"최대공약수, 최소공배수, 그리고 a^b mod m.","limits":"값 ≤ 10¹⁸ / 시간 O(log N)","logic":"유클리드 호제법은 a, b = b, a % b 한 줄. 거듭제곱은 지수를 이진수로 보고 절반씩 접는다.","code":"def gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a\n\n\ndef lcm(a, b):\n    return a // gcd(a, b) * b\n\n\ndef power_mod(base, exp, mod):\n    result = 1\n    base %= mod\n    while exp > 0:\n        if exp & 1:\n            result = result * base % mod\n        base = base * base % mod\n        exp >>= 1\n    return result","lv":4},{"id":"bs-bound","cat":"이분탐색","title":"lower / upper bound","brief":"정렬 배열에서 target 이상이 처음 나오는 위치, target 초과가 처음 나오는 위치.","limits":"N ≤ 1,000,000 / 시간 O(log N)","logic":"while lo < hi, hi = mid 를 쓴다. upper는 부등호에 등호를 하나 더 붙이는 것만 다르다. 개수 = upper - lower.","code":"def lower_bound(arr, target):\n    lo, hi = 0, len(arr)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if arr[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo\n\n\ndef upper_bound(arr, target):\n    lo, hi = 0, len(arr)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if arr[mid] <= target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo","lv":5},{"id":"bs-param","cat":"이분탐색","title":"파라메트릭 서치","brief":"길이 N의 랜선들을 잘라 K개를 만들 때 가능한 최대 길이.","limits":"N ≤ 10,000 / 길이 ≤ 2³¹−1 / 시간 O(N log max)","logic":"답 자체를 이분탐색한다. possible(x)가 단조(참→거짓)여야 성립. 최댓값을 찾을 땐 참이면 lo = mid+1, 답은 hi.","code":"def max_cut_length(lines, k):\n    def count(length):\n        return sum(x // length for x in lines)\n\n    lo, hi = 1, max(lines)\n    answer = 0\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if count(mid) >= k:\n            answer = mid\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return answer","lv":5},{"id":"st-monotonic","cat":"자료구조","title":"오큰수 (모노토닉 스택)","brief":"각 원소의 오른쪽에서 처음으로 자기보다 큰 수. 없으면 -1.","limits":"N ≤ 1,000,000 / 시간 O(N)","logic":"인덱스를 담은 감소 스택을 유지한다. 현재 값이 스택 top보다 크면 그 top의 답이 확정되므로 꺼내면서 채운다.","code":"def next_greater(arr):\n    res = [-1] * len(arr)\n    stack = []\n    for i, x in enumerate(arr):\n        while stack and arr[stack[-1]] < x:\n            res[stack.pop()] = x\n        stack.append(i)\n    return res","lv":5},{"id":"pq-kth","cat":"우선순위큐","title":"최소/최대 힙 다루기","brief":"스트림에서 K번째로 큰 값을 매번 알아낸다.","limits":"N ≤ 200,000 / 시간 O(N log K)","logic":"크기 K인 최소 힙을 유지하면 루트가 K번째 큰 값. 파이썬 heapq는 최소 힙뿐이라 최대 힙은 부호를 뒤집는다.","code":"import heapq\n\n\ndef kth_largest_stream(nums, k):\n    heap = []\n    res = []\n    for x in nums:\n        heapq.heappush(heap, x)\n        if len(heap) > k:\n            heapq.heappop(heap)\n        res.append(heap[0] if len(heap) == k else -1)\n    return res","lv":5},{"id":"pq-room","cat":"우선순위큐","title":"최소 회의실 개수","brief":"회의 [시작, 끝] 목록에 필요한 최소 회의실 수.","limits":"N ≤ 200,000 / 시간 O(N log N)","logic":"시작 시각 기준 정렬 후 끝나는 시각을 최소 힙에 넣는다. 가장 빨리 끝나는 회의가 이미 끝났으면 방을 재사용한다.","code":"import heapq\n\n\ndef min_rooms(meetings):\n    meetings = sorted(meetings)\n    heap = []\n    for start, end in meetings:\n        if heap and heap[0] <= start:\n            heapq.heappop(heap)\n        heapq.heappush(heap, end)\n    return len(heap)","lv":5},{"id":"bt-nqueen","cat":"백트래킹","title":"N-Queen","brief":"N×N 체스판에 서로 공격하지 않는 퀸 N개를 놓는 경우의 수.","limits":"N ≤ 14 / 시간 O(N!) 가지치기 포함","logic":"행 단위로 내려가며 열·대각선 두 방향을 집합으로 막는다. 대각선 키는 r+c 와 r-c.","code":"def n_queens(n):\n    cols = set()\n    diag1 = set()\n    diag2 = set()\n    count = 0\n\n    def back(row):\n        nonlocal count\n        if row == n:\n            count += 1\n            return\n        for c in range(n):\n            if c in cols or (row + c) in diag1 or (row - c) in diag2:\n                continue\n            cols.add(c)\n            diag1.add(row + c)\n            diag2.add(row - c)\n            back(row + 1)\n            cols.remove(c)\n            diag1.remove(row + c)\n            diag2.remove(row - c)\n\n    back(0)\n    return count","lv":5},{"id":"dp-knapsack","cat":"DP","title":"0-1 배낭","brief":"무게 한도 W에서 물건을 골라 가치 합을 최대로.","limits":"N ≤ 100, W ≤ 100,000 / 시간 O(NW)","logic":"1차원 dp를 무게 역순으로 순회해야 같은 물건을 두 번 담지 않는다. 정순으로 돌면 무한 배낭이 된다.","code":"def knapsack(items, capacity):\n    dp = [0] * (capacity + 1)\n    for weight, value in items:\n        for w in range(capacity, weight - 1, -1):\n            dp[w] = max(dp[w], dp[w - weight] + value)\n    return dp[capacity]","lv":5},{"id":"dp-lis","cat":"DP","title":"최장 증가 부분수열","brief":"수열에서 증가하는 부분수열의 최대 길이.","limits":"N ≤ 1,000,000 / 시간 O(N log N)","logic":"값을 담는 tails 배열에 bisect_left로 덮어쓴다. tails는 실제 LIS가 아니라 길이만 보장한다는 점이 함정.","code":"from bisect import bisect_left\n\n\ndef lis_length(arr):\n    tails = []\n    for x in arr:\n        i = bisect_left(tails, x)\n        if i == len(tails):\n            tails.append(x)\n        else:\n            tails[i] = x\n    return len(tails)","lv":5},{"id":"dp-lcs","cat":"DP","title":"최장 공통 부분수열","brief":"두 문자열의 공통 부분수열 중 가장 긴 것의 길이.","limits":"길이 ≤ 5,000 / 시간 O(NM)","logic":"글자가 같으면 왼쪽 위 대각선 +1, 다르면 위/왼쪽 중 큰 값. 2차원 표의 기본형.","code":"def lcs_length(a, b):\n    n, m = len(a), len(b)\n    dp = [[0] * (m + 1) for _ in range(n + 1)]\n    for i in range(1, n + 1):\n        for j in range(1, m + 1):\n            if a[i - 1] == b[j - 1]:\n                dp[i][j] = dp[i - 1][j - 1] + 1\n            else:\n                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])\n    return dp[n][m]","lv":5},{"id":"gr-dijkstra","cat":"최단경로","title":"다익스트라","brief":"가중치가 음이 아닌 그래프에서 시작점부터 모든 정점까지 최단 거리.","limits":"V ≤ 20,000, E ≤ 300,000 / 시간 O(E log V)","logic":"힙에서 꺼낸 거리가 기록된 거리보다 크면 버린다(지연 삭제). 이 한 줄이 없으면 시간 초과가 난다.","code":"import heapq\n\n\ndef dijkstra(n, graph, start):\n    INF = float(\"inf\")\n    dist = [INF] * n\n    dist[start] = 0\n    heap = [(0, start)]\n    while heap:\n        d, cur = heapq.heappop(heap)\n        if d > dist[cur]:\n            continue\n        for nxt, w in graph[cur]:\n            nd = d + w\n            if nd < dist[nxt]:\n                dist[nxt] = nd\n                heapq.heappush(heap, (nd, nxt))\n    return dist","lv":5},{"id":"gr-floyd","cat":"최단경로","title":"플로이드-워셜","brief":"모든 정점 쌍 사이의 최단 거리를 한 번에 구한다.","limits":"V ≤ 400 / 시간 O(V³)","logic":"경유지 k가 가장 바깥 루프여야 한다. 순서를 바꾸면 답이 틀린다.","code":"def floyd(n, edges):\n    INF = float(\"inf\")\n    dist = [[INF] * n for _ in range(n)]\n    for i in range(n):\n        dist[i][i] = 0\n    for u, v, w in edges:\n        dist[u][v] = min(dist[u][v], w)\n    for k in range(n):\n        for i in range(n):\n            for j in range(n):\n                if dist[i][k] + dist[k][j] < dist[i][j]:\n                    dist[i][j] = dist[i][k] + dist[k][j]\n    return dist","lv":5},{"id":"gr-topo","cat":"그래프","title":"위상 정렬","brief":"선행 관계가 있는 작업들의 수행 순서. 사이클이 있으면 빈 리스트.","limits":"V ≤ 32,000, E ≤ 100,000 / 시간 O(V+E)","logic":"진입차수 0인 정점을 큐에 넣고 빼면서 이웃의 차수를 깎는다. 결과 길이가 V보다 작으면 사이클이 있다.","code":"from collections import deque\n\n\ndef topological_sort(n, graph):\n    indegree = [0] * n\n    for u in range(n):\n        for v in graph[u]:\n            indegree[v] += 1\n    q = deque([i for i in range(n) if indegree[i] == 0])\n    order = []\n    while q:\n        cur = q.popleft()\n        order.append(cur)\n        for nxt in graph[cur]:\n            indegree[nxt] -= 1\n            if indegree[nxt] == 0:\n                q.append(nxt)\n    return order if len(order) == n else []","lv":5},{"id":"gr-mst","cat":"그래프","title":"크루스칼 + 유니온 파인드","brief":"모든 정점을 잇는 최소 비용 신장 트리의 가중치 합.","limits":"V ≤ 10,000, E ≤ 100,000 / 시간 O(E log E)","logic":"간선을 가중치순으로 정렬하고 사이클이 안 생길 때만 채택. find는 경로 압축, union은 랭크 비교.","code":"def kruskal(n, edges):\n    parent = list(range(n))\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    def union(a, b):\n        ra, rb = find(a), find(b)\n        if ra == rb:\n            return False\n        parent[rb] = ra\n        return True\n\n    total = 0\n    for w, u, v in sorted(edges):\n        if union(u, v):\n            total += w\n    return total","lv":5},{"id":"tree-dfs","cat":"트리","title":"트리 부모·깊이 구하기","brief":"루트가 1인 트리에서 각 노드의 부모와 깊이를 구한다.","limits":"N ≤ 100,000 / 시간 O(N)","logic":"부모 배열이 곧 방문 배열 역할을 한다. 반복형 BFS로 돌려야 재귀 깊이 제한을 피한다.","code":"from collections import deque\n\n\ndef tree_info(n, graph, root=0):\n    parent = [-1] * n\n    depth = [0] * n\n    visited = [False] * n\n    visited[root] = True\n    q = deque([root])\n    while q:\n        cur = q.popleft()\n        for nxt in graph[cur]:\n            if not visited[nxt]:\n                visited[nxt] = True\n                parent[nxt] = cur\n                depth[nxt] = depth[cur] + 1\n                q.append(nxt)\n    return parent, depth","lv":5},{"id":"str-kmp","cat":"문자열","title":"KMP 패턴 매칭","brief":"문자열 안에서 패턴이 나타나는 모든 시작 위치.","limits":"길이 ≤ 1,000,000 / 시간 O(N+M)","logic":"실패 함수 pi[i] = 접두사와 접미사가 일치하는 최대 길이. 본 매칭 루프는 실패 함수 만드는 루프와 구조가 똑같다.","code":"def build_pi(pattern):\n    pi = [0] * len(pattern)\n    j = 0\n    for i in range(1, len(pattern)):\n        while j > 0 and pattern[i] != pattern[j]:\n            j = pi[j - 1]\n        if pattern[i] == pattern[j]:\n            j += 1\n            pi[i] = j\n    return pi\n\n\ndef kmp(text, pattern):\n    pi = build_pi(pattern)\n    res = []\n    j = 0\n    for i in range(len(text)):\n        while j > 0 and text[i] != pattern[j]:\n            j = pi[j - 1]\n        if text[i] == pattern[j]:\n            if j == len(pattern) - 1:\n                res.append(i - len(pattern) + 1)\n                j = pi[j]\n            else:\n                j += 1\n    return res","lv":5},{"id":"bit-tsp","cat":"비트마스킹","title":"외판원 순회 (비트마스크 DP)","brief":"모든 도시를 한 번씩 방문하고 출발지로 돌아오는 최소 비용.","limits":"N ≤ 16 / 시간 O(2^N · N²)","logic":"상태는 (방문 집합, 현재 도시). 방문 여부를 정수 비트로 압축하는 게 핵심. N이 20을 넘으면 못 쓴다.","code":"def tsp(cost):\n    n = len(cost)\n    INF = float(\"inf\")\n    full = (1 << n) - 1\n    dp = [[INF] * n for _ in range(1 << n)]\n    dp[1][0] = 0\n    for mask in range(1 << n):\n        for cur in range(n):\n            if dp[mask][cur] == INF or not (mask & (1 << cur)):\n                continue\n            for nxt in range(n):\n                if mask & (1 << nxt) or cost[cur][nxt] == 0:\n                    continue\n                nmask = mask | (1 << nxt)\n                value = dp[mask][cur] + cost[cur][nxt]\n                if value < dp[nmask][nxt]:\n                    dp[nmask][nxt] = value\n    best = INF\n    for cur in range(1, n):\n        if dp[full][cur] != INF and cost[cur][0]:\n            best = min(best, dp[full][cur] + cost[cur][0])\n    return best","lv":5},{"id":"ct-fastio","cat":"실전","title":"빠른 입출력 + 다중 테스트케이스","brief":"테스트케이스가 여러 개인 문제를 한 번에 읽고 한 번에 출력한다.","limits":"입력 1,000,000줄 / 시간 O(N)","logic":"전부 read().split()으로 읽고 인덱스를 밀면서 쓴다. 출력도 매번 print 하지 말고 리스트에 모아 한 번에 쓴다. 이것만으로 시간 초과가 풀리는 문제가 많다.","code":"import sys\n\n\ndef main():\n    data = sys.stdin.read().split()\n    idx = 0\n    t = int(data[idx])\n    idx += 1\n    out = []\n    for _ in range(t):\n        n = int(data[idx])\n        idx += 1\n        nums = list(map(int, data[idx:idx + n]))\n        idx += n\n        out.append(str(sum(nums)))\n    sys.stdout.write(\"\\n\".join(out))","lv":6},{"id":"ct-sim-dir","cat":"실전","title":"방향 전환 시뮬레이션","brief":"명령대로 회전하고 전진하되 격자 밖으로는 나가지 않는다.","limits":"명령 ≤ 100,000 / 시간 O(N)","logic":"방향 배열을 북·동·남·서 시계 순서로 두면 오른쪽은 +1, 왼쪽은 +3 (즉 -1)을 4로 나눈 나머지. 순서를 섞어 적으면 전부 틀린다.","code":"def simulate(commands, n):\n    dr, dc = [-1, 0, 1, 0], [0, 1, 0, -1]\n    r = c = d = 0\n    for cmd in commands:\n        if cmd == \"L\":\n            d = (d + 3) % 4\n        elif cmd == \"R\":\n            d = (d + 1) % 4\n        else:\n            nr, nc = r + dr[d], c + dc[d]\n            if 0 <= nr < n and 0 <= nc < n:\n                r, c = nr, nc\n    return r, c, d","lv":6},{"id":"ct-bfs-state","cat":"실전","title":"상태를 추가한 BFS","brief":"벽을 최대 K번 부술 수 있을 때의 최단 거리.","limits":"N, M ≤ 1000, K ≤ 10 / 시간 O(NMK)","logic":"visited를 [행][열][남은 기회] 3차원으로 늘리는 게 전부다. 같은 칸이라도 남은 기회가 다르면 다른 상태라는 점이 핵심.","code":"from collections import deque\n\n\ndef shortest_with_break(grid, limit):\n    n, m = len(grid), len(grid[0])\n    dist = [[[0] * (limit + 1) for _ in range(m)] for _ in range(n)]\n    dr, dc = [-1, 1, 0, 0], [0, 0, -1, 1]\n    q = deque([(0, 0, 0)])\n    dist[0][0][0] = 1\n    while q:\n        r, c, k = q.popleft()\n        if (r, c) == (n - 1, m - 1):\n            return dist[r][c][k]\n        for i in range(4):\n            nr, nc = r + dr[i], c + dc[i]\n            if not (0 <= nr < n and 0 <= nc < m):\n                continue\n            if grid[nr][nc] == 0 and dist[nr][nc][k] == 0:\n                dist[nr][nc][k] = dist[r][c][k] + 1\n                q.append((nr, nc, k))\n            elif grid[nr][nc] == 1 and k < limit and dist[nr][nc][k + 1] == 0:\n                dist[nr][nc][k + 1] = dist[r][c][k] + 1\n                q.append((nr, nc, k + 1))\n    return -1","lv":6},{"id":"ct-dp-path","cat":"실전","title":"DP + 경로 복원","brief":"최댓값만이 아니라 그 값을 만든 실제 답까지 되짚는다.","limits":"길이 ≤ 5,000 / 시간 O(NM)","logic":"표를 다 채운 뒤 오른쪽 아래에서 거꾸로 걸어 나온다. 글자가 같으면 대각선으로, 아니면 큰 쪽으로. 마지막에 뒤집는 걸 잊지 않는다.","code":"def lcs_with_path(a, b):\n    n, m = len(a), len(b)\n    dp = [[0] * (m + 1) for _ in range(n + 1)]\n    for i in range(1, n + 1):\n        for j in range(1, m + 1):\n            if a[i - 1] == b[j - 1]:\n                dp[i][j] = dp[i - 1][j - 1] + 1\n            else:\n                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])\n    path = []\n    i, j = n, m\n    while i > 0 and j > 0:\n        if a[i - 1] == b[j - 1]:\n            path.append(a[i - 1])\n            i -= 1\n            j -= 1\n        elif dp[i - 1][j] >= dp[i][j - 1]:\n            i -= 1\n        else:\n            j -= 1\n    return dp[n][m], \"\".join(reversed(path))","lv":6},{"id":"ct-compress","cat":"실전","title":"좌표 압축","brief":"값의 범위는 넓지만 개수는 적을 때 인덱스로 눌러 담는다.","limits":"N ≤ 1,000,000 / 시간 O(N log N)","logic":"중복 제거 후 정렬한 표를 만들고 bisect_left로 순위를 찾는다. 배열 크기를 값 범위가 아니라 개수로 줄이는 전처리.","code":"from bisect import bisect_left\n\n\ndef compress(nums):\n    table = sorted(set(nums))\n    return [bisect_left(table, x) for x in nums], table","lv":6}];
+
+var LEVELS = [
+  { n: 1, name: '첫걸음', sub: '코딩 시작', desc: '변수·if·for·리스트·딕셔너리처럼 모든 코드의 바닥이 되는 문법. 한 편이 5~10줄이라 오늘 하나는 확실히 끝낼 수 있습니다. 여기가 헐거우면 위 단계는 아무리 봐도 안 붙습니다.' },
+  { n: 2, name: '입문', sub: 'Lv1 준비', desc: '리스트 컴프리헨션, enumerate·zip, 2차원 배열, 정렬 기본. 문법은 아는데 손이 안 따라갈 때 그 간격을 메우는 단계입니다.' },
+  { n: 3, name: '초보', sub: 'Lv1 통과선', desc: '해시·누적합·그리디·슬라이딩 윈도우·약수와 소수·빠른 입력. Lv1을 안정적으로 통과하는 데 필요한 최소 도구함.' },
+  { n: 4, name: '중급', sub: 'Lv2 핵심', desc: 'BFS·DFS·스택·조합과 순열 재귀·기본 DP·이분탐색. Lv1과 Lv2를 가르는 지점이 정확히 여기입니다.' },
+  { n: 5, name: '고급', sub: 'Lv3 이상', desc: '다익스트라·위상정렬·MST·LIS·KMP·비트마스크 DP. 대회형 문제와 상위권 기업 코테 구간.' },
+  { n: 6, name: '코테 실전', sub: '시험장 패턴', desc: '빠른 입출력·상태 추가 BFS·경로 복원·좌표 압축. 유형 하나가 아니라 시험장에서 바로 꺼내 쓰는 복합 패턴.' }
+];
+
+
+var COURSES = [
+  { id: 'c1', lv: 1, name: '기초 코스', sub: '파이썬을 손에 붙인다', pace: 2, need: '',
+    goal: '변수·조건문·반복문·리스트·딕셔너리를 아무것도 안 보고 쓸 수 있게 됩니다.',
+    after: '프로그래머스 Lv0 문제를 읽고 바로 코드로 옮길 수 있습니다. 문법이 막혀서 멈추는 일이 사라집니다.' },
+  { id: 'c2', lv: 2, name: '입문 코스', sub: 'Lv1을 풀 준비', pace: 2, need: '기초 코스',
+    goal: '리스트 컴프리헨션, enumerate·zip, 2차원 배열, 정렬 키를 손에 붙입니다.',
+    after: '문법은 아는데 손이 안 따라가던 구간이 메워집니다. Lv1 문제를 읽고 30분 안에 접근법이 잡힙니다.' },
+  { id: 'c3', lv: 3, name: 'Lv1 통과 코스', sub: '도구함 채우기', pace: 2, need: '입문 코스',
+    goal: '해시·누적합·그리디·슬라이딩 윈도우·약수와 소수·빠른 입력을 익힙니다.',
+    after: '프로그래머스 Lv1을 안정적으로 통과합니다. 시간 초과가 왜 나는지 감이 잡히기 시작합니다.' },
+  { id: 'c4', lv: 4, name: 'Lv2 돌파 코스', sub: 'Lv1과 Lv2의 경계', pace: 2, need: 'Lv1 통과 코스',
+    goal: 'BFS·DFS·스택·조합과 순열 재귀·기본 DP·이분탐색을 통째로 외웁니다.',
+    after: 'Lv2 문제를 보고 어떤 유형인지 바로 분류하고, 뼈대를 먼저 깔고 시작할 수 있습니다.' },
+  { id: 'c5', lv: 5, name: '고급 코스', sub: 'Lv3 이상', pace: 1, need: 'Lv2 돌파 코스',
+    goal: '다익스트라·위상정렬·MST·LIS·LCS·KMP·비트마스크 DP.',
+    after: '대회형 문제와 상위권 기업 코테의 중상 난이도까지 손이 닿습니다.' },
+  { id: 'c6', lv: 6, name: '코테 실전 코스', sub: '시험장 패턴', pace: 1, need: 'Lv2 돌파 코스',
+    goal: '빠른 입출력, 상태 추가 BFS, 경로 복원, 좌표 압축, 방향 시뮬레이션.',
+    after: '유형 하나가 아니라 여러 개가 겹친 실전 문제에서 조합해 쓸 수 있습니다.' }
+];
+
+var ORD = {};
+CATALOG.forEach(function (c, i) { ORD[c.id] = i; });
+function ordOf(p) { return (p && p.srcId != null && ORD[p.srcId] != null) ? ORD[p.srcId] : 99999; }
+
+var DEFAULTS = {
+  intervals: [1, 3, 7, 14, 30], pass: 80, retry: true, readGoal: 20, newGoal: 1,
+  streakNeed: 3, secPerLine: 10, baseSec: 30, decayDays: 30, gate: false, gateDone: '', gateSkip: 0,
+  trialMax: 10, bankSort: 'lv'
+};
+var S = {
+  problems: [], books: [], insights: [], settings: Object.assign({}, DEFAULTS),
+  view: 'dash', form: null, bookForm: false, insForm: false, sel: null,
+  filter: { q: '', cat: '', lv: '' }, test: null, pending: false, mode: 'local', canImport: false,
+  packSel: {}, packPerDay: 2, packLv: 1,
+  drill: null, daily: {}, courseSel: null, hist: []
+};
+
+/* ============ storage ============ */
+var LS = 'algo-memory:v1';
+var DB = null;
+
+function resolveDb() {
+  return new Promise(function (resolve) {
+    /* 아티팩트 런타임은 iframe 안에서 돌아간다. 최상위 문서(깃허브 페이지 등)라면
+       계정 저장소가 있을 수 없으므로 기다리지 않고 브라우저 저장소를 쓴다. */
+    var embedded = true;
+    try { embedded = (window.top !== window.self); } catch (e) { embedded = true; }
+    if (!embedded && !(window.claude && typeof window.claude.use === 'function')) { resolve(null); return; }
+    var t0 = Date.now();
+    (function tick() {
+      if (window.claude && typeof window.claude.use === 'function') {
+        try {
+          window.claude.use('db').then(function (d) { resolve(d || null); }, function () { resolve(null); });
+        } catch (e) { resolve(null); }
+        return;
+      }
+      if (Date.now() - t0 > 4000) { resolve(null); return; }
+      setTimeout(tick, 100);
+    })();
+  });
+}
+
+function loadLocal() {
+  try {
+    var raw = localStorage.getItem(LS);
+    if (!raw) return;
+    var o = JSON.parse(raw);
+    S.problems = o.problems || []; S.books = o.books || []; S.insights = o.insights || [];
+    S.settings = Object.assign({}, DEFAULTS, o.settings || {});
+    S.daily = o.daily || {};
+  } catch (e) { /* storage may be unavailable */ }
+}
+function saveLocal() {
+  if (S.mode === 'cloud') return;
+  try {
+    localStorage.setItem(LS, JSON.stringify({
+      problems: S.problems, books: S.books, insights: S.insights, settings: S.settings, daily: S.daily
+    }));
+  } catch (e) { /* quota or disabled */ }
+}
+
+/* 저장은 부가 기능이다. 동기 예외든 거부든 화면 흐름을 절대 막지 않는다. */
+function dbWrite(fn) {
+  if (!DB) return Promise.resolve();
+  try {
+    var r = fn();
+    return (r && r.then) ? r.then(null, function () { }) : Promise.resolve();
+  } catch (e) { return Promise.resolve(); }
+}
+function strip(o) {
+  var c = {};
+  Object.keys(o).forEach(function (k) { if (k !== 'id' && o[k] !== undefined) c[k] = o[k]; });
+  return c;
+}
+
+function put(coll, arr, obj) {
+  var i = -1;
+  for (var k = 0; k < arr.length; k++) if (arr[k].id === obj.id) { i = k; break; }
+  if (i < 0) arr.push(obj); else arr[i] = obj;
+  if (DB) return dbWrite(function () { return DB.collection(coll).doc(obj.id).set(strip(obj)); });
+  saveLocal(); return Promise.resolve();
+}
+function putMany(coll, arr, objs) {
+  objs.forEach(function (o) { arr.push(o); });
+  if (!DB) { saveLocal(); return Promise.resolve(); }
+  var i = 0;
+  function chunk() {
+    if (i >= objs.length) return Promise.resolve();
+    var part = objs.slice(i, i + 6); i += 6;
+    return Promise.all(part.map(function (o) {
+      return dbWrite(function () { return DB.collection(coll).doc(o.id).set(strip(o)); });
+    })).then(chunk);
+  }
+  return chunk().catch(function () { toast('일부 저장에 실패했습니다'); });
+}
+function drop(coll, arr, id) {
+  for (var k = 0; k < arr.length; k++) if (arr[k].id === id) { arr.splice(k, 1); break; }
+  if (DB) return dbWrite(function () { return DB.collection(coll).doc(id).delete(); });
+  saveLocal(); return Promise.resolve();
+}
+function saveDaily() {
+  if (DB) return dbWrite(function () {
+    var rows = Object.keys(S.daily).sort().map(function (k) {
+      var v = S.daily[k] || {};
+      return { d: k, w: v.w || 0, c: v.c || 0, r: v.r || 0 };
+    });
+    return DB.doc('config/daily').set({ rows: rows });
+  });
+  saveLocal(); return Promise.resolve();
+}
+function saveSettings() {
+  if (DB) return dbWrite(function () { return DB.doc('config/settings').set(S.settings); });
+  saveLocal(); return Promise.resolve();
+}
+
+function subscribe() {
+  var sub = function (coll, key) {
+    DB.collection(coll).onSnapshot(function (snap) {
+      S[key] = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      if (key === 'problems') syncCatalogCode();
+      checkImport(); softRender();
+    }, function () { });
+  };
+  sub('problems', 'problems'); sub('books', 'books'); sub('insights', 'insights');
+  DB.doc('config/settings').onSnapshot(function (s) {
+    if (s.exists) S.settings = Object.assign({}, DEFAULTS, s.data());
+    softRender();
+  }, function () { });
+  DB.doc('config/daily').onSnapshot(function (s) {
+    if (!s.exists) return;
+    var data = s.data() || {}, out = {};
+    if (Array.isArray(data.rows)) {
+      data.rows.forEach(function (r) {
+        if (r && r.d) out[r.d] = { w: r.w || 0, c: r.c || 0, r: r.r || 0 };
+      });
+    } else if (data.days) {
+      Object.keys(data.days).forEach(function (k) { out[k] = data.days[k]; });
+    }
+    S.daily = out;
+    softRender();
+  }, function () { });
+}
+
+var _localBackup = null;
+function checkImport() {
+  if (S.mode !== 'cloud' || !_localBackup) return;
+  var cloudEmpty = !S.problems.length && !S.books.length && !S.insights.length;
+  var localHas = (_localBackup.problems || []).length || (_localBackup.books || []).length || (_localBackup.insights || []).length;
+  S.canImport = !!(cloudEmpty && localHas);
+}
+function importLocal() {
+  if (!_localBackup || !DB) return;
+  var jobs = [];
+  (_localBackup.problems || []).forEach(function (p) { jobs.push(DB.collection('problems').doc(p.id).set(strip(p))); });
+  (_localBackup.books || []).forEach(function (b) { jobs.push(DB.collection('books').doc(b.id).set(strip(b))); });
+  (_localBackup.insights || []).forEach(function (i) { jobs.push(DB.collection('insights').doc(i.id).set(strip(i))); });
+  if (_localBackup.settings) jobs.push(DB.doc('config/settings').set(Object.assign({}, DEFAULTS, _localBackup.settings)));
+  Promise.all(jobs).then(function () { S.canImport = false; toast('로컬 데이터를 가져왔습니다'); render(); },
+    function () { toast('가져오기 중 일부가 실패했습니다'); });
+}
+
+/* ============ code analysis ============ */
+function stripBlocks(code, lang) {
+  if (lang === 'python') return code.replace(/"""[\s\S]*?"""/g, '').replace(/'''[\s\S]*?'''/g, '');
+  return code.replace(/\/\*[\s\S]*?\*\//g, '');
+}
+function stripLine(line, hash) {
+  var q = null;
+  for (var i = 0; i < line.length; i++) {
+    var c = line[i];
+    if (q) { if (c === '\\') { i++; continue; } if (c === q) q = null; continue; }
+    if (c === '"' || c === "'") { q = c; continue; }
+    if (hash && c === '#') return line.slice(0, i);
+    if (!hash && c === '/' && line[i + 1] === '/') return line.slice(0, i);
+  }
+  return line;
+}
+function normalize(code, lang) {
+  var hash = (lang === 'python');
+  var src = stripBlocks(String(code || ''), lang).replace(/\r\n?/g, '\n');
+  var out = [];
+  src.split('\n').forEach(function (raw) {
+    var s = stripLine(raw, hash);
+    var lead = (s.match(/^[\t ]*/) || [''])[0].replace(/\t/g, '    ');
+    var body = s.trim().replace(/[ \t]+/g, ' ');
+    if (!body) return;
+    var depth = Math.round(lead.length / 4);
+    out.push({ depth: depth, text: body, key: depth + '\u0001' + body });
+  });
+  return out;
+}
+function lcsDiff(a, b) {
+  var n = a.length, m = b.length, i, j;
+  var dp = []; for (i = 0; i <= n; i++) dp.push(new Int32Array(m + 1));
+  for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--)
+    dp[i][j] = a[i].key === b[j].key ? dp[i + 1][j + 1] + 1 : (dp[i + 1][j] >= dp[i][j + 1] ? dp[i + 1][j] : dp[i][j + 1]);
+  var ops = []; i = 0; j = 0;
+  while (i < n && j < m) {
+    if (a[i].key === b[j].key) { ops.push({ t: 'same', a: a[i], b: b[j] }); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push({ t: 'miss', a: a[i] }); i++; }
+    else { ops.push({ t: 'extra', b: b[j] }); j++; }
+  }
+  while (i < n) ops.push({ t: 'miss', a: a[i++] });
+  while (j < m) ops.push({ t: 'extra', b: b[j++] });
+  return { ops: ops, lcs: n && m ? dp[0][0] : 0, n: n, m: m };
+}
+function markPair(x, y) {
+  var L = Math.min(x.length, y.length), p = 0, s = 0;
+  while (p < L && x[p] === y[p]) p++;
+  while (s < L - p && x[x.length - 1 - s] === y[y.length - 1 - s]) s++;
+  function wrap(t) {
+    var mid = t.slice(p, t.length - s);
+    return esc(t.slice(0, p)) + (mid ? '<mark>' + esc(mid) + '</mark>' : '') + esc(t.slice(t.length - s));
+  }
+  return [wrap(x), wrap(y)];
+}
+function features(lines) {
+  var f = {}, names = [];
+  function bump(k) { f[k] = (f[k] || 0) + 1; }
+  lines.forEach(function (l) {
+    var t = l.text, m;
+    if ((m = /^def\s+(\w+)/.exec(t))) { bump('함수 정의(def)'); names.push(m[1]); }
+    if (/^class\s+\w+/.test(t)) bump('클래스 정의');
+    if (/^(import|from)\s+/.test(t)) bump('import 구문');
+    if (/^for\b/.test(t)) bump('for 반복문');
+    if (/^while\b/.test(t)) bump('while 반복문');
+    if (/^if\b/.test(t)) bump('if 분기');
+    if (/^elif\b|^else\s+if\b/.test(t)) bump('elif 분기');
+    if (/^else\b/.test(t)) bump('else 분기');
+    if (/\breturn\b/.test(t)) bump('return 반환');
+    if (/\bdeque\b/.test(t)) bump('deque');
+    if (/\bheap(q|push|pop)/.test(t)) bump('heapq');
+    if (/\bdefaultdict\b|\bCounter\b/.test(t)) bump('collections');
+    if (/\bvisited\b|\bchecked\b/.test(t)) bump('방문 배열');
+    if (/\bdp\b/.test(t)) bump('dp 배열');
+    if (/sys\.stdin|readline|input\(\)|Scanner|cin\s*>>/.test(t)) bump('입력 처리');
+    if (/\bprint\(|System\.out|cout\s*<</.test(t)) bump('출력 처리');
+    if (/\bsort(ed)?\s*\(|\.sort\(/.test(t)) bump('정렬');
+    if (/\[[^\]]*\bfor\s+\w+\s+in\b/.test(t)) bump('리스트 컴프리헨션');
+    if (/setrecursionlimit/.test(t)) bump('재귀 한도 설정');
+  });
+  if (names.length) {
+    lines.forEach(function (l) {
+      if (/^def\s/.test(l.text)) return;
+      for (var i = 0; i < names.length; i++) {
+        if (new RegExp('\\b' + names[i] + '\\s*\\(').test(l.text)) { bump('함수 호출/재귀'); break; }
+      }
+    });
+  }
+  return f;
+}
+function tagOf(t) {
+  if (/^(for|while)\b/.test(t)) return '반복문';
+  if (/^(if|elif|else)\b/.test(t)) return '조건 분기';
+  if (/^(def|class)\b/.test(t)) return '함수·클래스 정의';
+  if (/^(import|from)\b/.test(t)) return 'import';
+  if (/\breturn\b/.test(t)) return 'return 반환';
+  if (/deque|heapq|defaultdict|Counter|set\(|dict\(|\[0\]\s*\*|\[\[/.test(t)) return '자료구조 초기화';
+  if (/input\(|print\(|sys\.|readline|cin|cout/.test(t)) return '입출력';
+  if (/\w+\s*\[[^\]]*\]/.test(t)) return '인덱싱/슬라이싱';
+  return '로직·수식';
+}
+
+function grade(original, answer, lang) {
+  var A = normalize(original, lang), B = normalize(answer, lang);
+  var d = lcsDiff(A, B);
+  var rate = (A.length + B.length) ? Math.round((2 * d.lcs / (A.length + B.length)) * 1000) / 10 : 0;
+
+  /* pair up miss/extra runs so near-misses read as one edited line */
+  var rows = [], tags = {}, i = 0;
+  function tag(t) { tags[t] = (tags[t] || 0) + 1; }
+  while (i < d.ops.length) {
+    var op = d.ops[i];
+    if (op.t === 'same') { rows.push({ k: 'same', d: op.a.depth, t: op.a.text }); i++; continue; }
+    var miss = [], extra = [];
+    while (i < d.ops.length && d.ops[i].t === 'miss') { miss.push(d.ops[i].a); i++; }
+    while (i < d.ops.length && d.ops[i].t === 'extra') { extra.push(d.ops[i].b); i++; }
+    var pairs = Math.min(miss.length, extra.length), k;
+    for (k = 0; k < pairs; k++) {
+      var h = markPair(miss[k].text, extra[k].text);
+      rows.push({ k: 'miss', d: miss[k].depth, html: h[0] });
+      rows.push({ k: 'extra', d: extra[k].depth, html: h[1] });
+      if (miss[k].text === extra[k].text) tag('들여쓰기'); else tag(tagOf(miss[k].text));
+    }
+    for (k = pairs; k < miss.length; k++) { rows.push({ k: 'miss', d: miss[k].depth, t: miss[k].text }); tag(tagOf(miss[k].text)); }
+    for (k = pairs; k < extra.length; k++) { rows.push({ k: 'extra', d: extra[k].depth, t: extra[k].text }); tag('불필요한 라인'); }
+  }
+
+  /* structural check */
+  var fa = features(A), fb = features(B), checks = [];
+  Object.keys(fa).forEach(function (k) {
+    var need = fa[k], got = fb[k] || 0;
+    checks.push({ k: k, need: need, got: got, ok: got >= need });
+  });
+  checks.sort(function (x, y) { return (x.ok === y.ok) ? y.need - x.need : (x.ok ? 1 : -1); });
+
+  return {
+    rate: rate, rows: rows, checks: checks,
+    tags: Object.keys(tags).map(function (k) { return { k: k, n: tags[k] }; }).sort(function (a, b) { return b.n - a.n; }),
+    origLines: A.length, userLines: B.length, matched: d.lcs
+  };
+}
+
+/* ============ syntax highlight ============ */
+var KW = /^(def|class|return|if|elif|else|for|while|in|not|and|or|import|from|as|with|try|except|finally|lambda|yield|break|continue|pass|global|nonlocal|is|None|True|False|self|void|int|public|private|static|const|let|var|function|new|null|true|false|fun|val|struct|include|using|namespace)$/;
+var BI = /^(print|range|len|str|input|append|appendleft|popleft|sorted|sort|set|dict|list|tuple|map|sum|min|max|abs|enumerate|zip|deque|heapq|heappush|heappop|defaultdict|Counter|sys|math|bisect|reversed|any|all|divmod|pow|ord|chr|join|split|strip|add|remove|pop|copy|format)$/;
+function hl(code) {
+  var src = String(code || ''), out = '', last = 0;
+  var re = /(#[^\n]*|\/\/[^\n]*)|("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|([A-Za-z_]\w*)|(\b\d+\.?\d*\b)/g;
+  var m;
+  while ((m = re.exec(src))) {
+    out += esc(src.slice(last, m.index));
+    last = re.lastIndex;
+    if (m[1]) out += '<span class="t-c">' + esc(m[1]) + '</span>';
+    else if (m[2]) out += '<span class="t-s">' + esc(m[2]) + '</span>';
+    else if (m[3]) {
+      if (KW.test(m[3])) out += '<span class="t-k">' + esc(m[3]) + '</span>';
+      else if (BI.test(m[3])) out += '<span class="t-b">' + esc(m[3]) + '</span>';
+      else out += esc(m[3]);
+    } else out += '<span class="t-n">' + esc(m[4]) + '</span>';
+  }
+  out += esc(src.slice(last));
+  return out;
+}
+
+/* ============ derived data ============ */
+function dueList() {
+  var T = today(), out = [];
+  S.problems.forEach(function (p) {
+    (p.schedule || []).forEach(function (s, i) {
+      if (!s.done && dayDiff(s.due, T) >= 0) out.push({ p: p, s: s, i: i, late: dayDiff(s.due, T) });
+    });
+  });
+  out.sort(function (a, b) { return b.late - a.late || ordOf(a.p) - ordOf(b.p); });
+  return out;
+}
+function doneOn(date) {
+  var n = 0;
+  S.problems.forEach(function (p) { (p.schedule || []).forEach(function (s) { if (s.done && s.doneAt === date) n++; }); });
+  return n;
+}
+function dueOn(date) {
+  var n = 0;
+  S.problems.forEach(function (p) { (p.schedule || []).forEach(function (s) { if (s.due === date) n++; }); });
+  return n;
+}
+function overdueCount() {
+  var T = today(), n = 0;
+  S.problems.forEach(function (p) { (p.schedule || []).forEach(function (s) { if (!s.done && dayDiff(s.due, T) > 0) n++; }); });
+  return n;
+}
+function pagesOn(date) {
+  var n = 0;
+  S.books.forEach(function (b) { (b.log || []).forEach(function (e) { if (e.d === date) n += e.p; }); });
+  return n;
+}
+function avgRate(p) {
+  var a = (p.attempts || []); if (!a.length) return null;
+  var s = 0; a.forEach(function (x) { s += x.rate; });
+  return Math.round(s / a.length * 10) / 10;
+}
+function bumpDaily(written, correct) {
+  var T = today(), d = S.daily[T] || { w: 0, c: 0, r: 0 };
+  d.w += written; d.c += correct; d.r += 1;
+  S.daily[T] = d;
+  var keys = Object.keys(S.daily).sort();
+  while (keys.length > 150) { delete S.daily[keys.shift()]; }
+  saveDaily();
+}
+function dayLines(date) { return (S.daily[date] || {}).w || 0; }
+function writeStreak() {
+  var n = 0, T = today();
+  if (!dayLines(T)) {
+    if (!dayLines(addDays(T, -1))) return 0;
+    T = addDays(T, -1);
+  }
+  while (dayLines(T) > 0) { n++; T = addDays(T, -1); }
+  return n;
+}
+var KO_RE = /[\uac00-\ud7a3\u3131-\u318e]/;
+/* 내장 코드에서 한글을 뺐다. 예전에 등록된 사본은 데이터가 실제로 도착한 뒤에
+   매번 확인해서 고친다. 고칠 게 없으면 아무 일도 하지 않으므로 반복 호출해도 안전하다. */
+function syncCatalogCode() {
+  if (!S.problems.length) return 0;
+  var byId = {};
+  CATALOG.forEach(function (c) { byId[c.id] = c; });
+  var fixes = [];
+  S.problems.forEach(function (p) {
+    var c = p.srcId && byId[p.srcId];
+    if (!c) return;
+    if (KO_RE.test(p.code || '') && !KO_RE.test(c.code)) {
+      fixes.push(Object.assign({}, p, { code: c.code, logic: c.logic, brief: c.brief }));
+    }
+  });
+  fixes.forEach(function (np) { put('problems', S.problems, np); });
+  return fixes.length;
+}
+function catalogCode(p) {
+  var c = p.srcId && CATALOG.filter(function (x) { return x.id === p.srcId; })[0];
+  if (c && KO_RE.test(p.code || '') && !KO_RE.test(c.code)) return c.code;
+  return p.code;
+}
+function normLines(p) { return normalize(catalogCode(p), p.lang || 'python').length; }
+function timeLimit(p) { return normLines(p) * S.settings.secPerLine + S.settings.baseSec; }
+function mmss(sec) { return pad(Math.floor(sec / 60)) + ':' + pad(Math.floor(sec % 60)); }
+function traceTarget(p) {
+  var lines = String(p.code || '').replace(/\r\n?/g, '\n').split('\n')
+    .map(function (l) { return l.replace(/[ \t]+$/, ''); });
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  return lines.join('\n');
+}
+function traceLines(t) { return t.split('\n').filter(function (l) { return l.trim(); }).length; }
+function mastery(p) {
+  var need = S.settings.streakNeed, st = p.streak || 0;
+  if (p.masteredAt) {
+    if (dayDiff(p.masteredAt, today()) > S.settings.decayDays)
+      return { k: 'recheck', label: '재확인 필요', st: st, need: need };
+    return { k: 'done', label: '암기 완료', st: st, need: need };
+  }
+  if (st > 0) return { k: 'near', label: '굳히는 중 ' + st + '/' + need, st: st, need: need };
+  if ((p.attempts || []).length) return { k: '암기중', label: '암기 중', st: 0, need: need };
+  return { k: 'none', label: '미착수', st: 0, need: need };
+}
+function masteryChip(m) {
+  var cls = m.k === 'done' ? 'accent' : (m.k === 'recheck' ? 'bad' : (m.k === 'near' ? 'warn' : ''));
+  return '<span class="chip ' + cls + '">' + (m.k === 'done' ? '✓ ' : '') + esc(m.label) + '</span>';
+}
+function masteredCount() {
+  return S.problems.filter(function (p) { return mastery(p).k === 'done'; }).length;
+}
+function gateProblem() {
+  if (!S.settings.gate) return null;
+  if (S.settings.gateDone === today()) return null;
+  var due = dueList();
+  if (due.length) return { p: due[0].p, i: due[0].i };
+  var re = S.problems.filter(function (p) { return mastery(p).k === 'recheck'; });
+  if (re.length) return { p: re[0], i: null };
+  return null;
+}
+function rateClass(r) { return r == null ? '' : (r >= S.settings.pass ? 'g' : (r >= 60 ? 'w' : 'b')); }
+function nextDue(p) {
+  var arr = (p.schedule || []).filter(function (s) { return !s.done; });
+  if (!arr.length) return null;
+  arr.sort(function (a, b) { return a.due < b.due ? -1 : 1; });
+  return arr[0].due;
+}
+
+/* ============ views ============ */
+function tile(lab, big, unit, note, pct, cls) {
+  return '<div class="tile"><div class="lab">' + esc(lab) + '</div>' +
+    '<div class="big">' + big + (unit ? '<em>' + esc(unit) + '</em>' : '') + '</div>' +
+    (note ? '<div class="note">' + esc(note) + '</div>' : '') +
+    '<div class="bar ' + (cls || '') + '"><i style="width:' + clamp(pct, 0, 100) + '%"></i></div></div>';
+}
+
+function viewDash() {
+  var due = dueList(), T = today();
+  var gp = gateProblem();
+  if (gp) {
+    var gm = mastery(gp.p);
+    return '<div class="card pad gate">' +
+      '<div class="chip bad" style="margin-bottom:10px">오늘의 관문</div>' +
+      '<h2 style="font-size:20px;margin-bottom:6px">' + esc(gp.p.title) + '</h2>' +
+      '<div class="row small muted" style="margin-bottom:14px">' +
+      '<span class="chip">' + esc(gp.p.category || '미분류') + '</span>' +
+      '<span class="chip mono">' + normLines(gp.p) + '줄</span>' +
+      '<span class="chip mono">제한 ' + mmss(timeLimit(gp.p)) + '</span>' +
+      masteryChip(gm) + '</div>' +
+      '<p class="small" style="color:var(--ink-2);margin-bottom:16px">' +
+      '이 문제를 힌트 없이, 제한 시간 안에, 100% 재현해야 나머지 화면이 열립니다. ' +
+      '조건을 하나라도 못 맞추면 연속 기록은 0으로 돌아갑니다.</p>' +
+      '<div class="row"><button class="btn accent" data-act="gate-start">관문 시작</button>' +
+      '<button class="btn ghost small" data-act="gate-skip">오늘은 건너뛰기</button>' +
+      (S.settings.gateSkip ? '<span class="small muted">누적 회피 ' + S.settings.gateSkip + '회</span>' : '') +
+      '</div></div>';
+  }
+  var doneT = doneOn(T), totalT = doneT + due.length;
+  var newT = S.problems.filter(function (p) { return p.createdAt === T; }).length;
+  var pagesT = pagesOn(T), over = due.filter(function (d) { return d.late > 0; }).length;
+
+  var h = '';
+  if (S.canImport) {
+    h += '<div class="card pad" style="margin-bottom:16px;border-color:var(--accent)">' +
+      '<div class="row"><div class="grow"><strong>이 브라우저에 저장된 기록이 있습니다.</strong>' +
+      '<div class="small muted">계정 저장소가 비어 있습니다. 기존 로컬 기록을 옮길 수 있습니다.</div></div>' +
+      '<button class="btn accent" data-act="import">가져오기</button>' +
+      '<button class="btn ghost" data-act="dismiss-import">나중에</button></div></div>';
+  }
+
+  h += '<div class="today-strip">' +
+    tile('오늘의 복습', doneT + '<em>/' + totalT + '</em>', '건',
+      over ? over + '건 지연 중' : '지연 없음',
+      totalT ? doneT / totalT * 100 : 100, over ? 'bad' : '') +
+    tile('신규 등록', newT + '<em>/' + S.settings.newGoal + '</em>', '문제', '오늘 새로 암기할 문제',
+      S.settings.newGoal ? newT / S.settings.newGoal * 100 : 100) +
+    tile('독서', pagesT + '<em>/' + S.settings.readGoal + '</em>', 'p', '오늘 읽은 분량',
+      S.settings.readGoal ? pagesT / S.settings.readGoal * 100 : 100, 'warn') +
+    (S.problems.length ? tile('암기 완료', masteredCount() + '<em>/' + S.problems.length + '</em>', '개',
+      '연속 ' + S.settings.streakNeed + '회 완벽 재현',
+      masteredCount() / S.problems.length * 100) : '') +
+    tile('오늘 쓴 줄', dayLines(T), '줄',
+      (writeStreak() ? '연속 ' + writeStreak() + '일 기록 중' : '오늘부터 다시 시작'),
+      Math.min(100, dayLines(T) / 40 * 100), 'warn') +
+    '</div>';
+
+  var recheck = S.problems.filter(function (p) { return mastery(p).k === 'recheck'; });
+  if (recheck.length) {
+    h += '<div class="sect-h"><h2>재확인이 필요한 문제</h2><span class="sub">' + recheck.length + '개 · 암기 후 ' + S.settings.decayDays + '일 경과</span></div>' +
+      '<div class="qlist" style="margin-bottom:22px">' + recheck.slice(0, 6).map(function (p) {
+        return '<div class="qrow over"><div class="meta"><div class="ttl">' + esc(p.title) + '</div>' +
+          '<div class="sub"><span class="chip">' + esc(p.category || '미분류') + '</span>' +
+          '<span class="chip bad">' + dayDiff(p.masteredAt, T) + '일 전 암기</span></div></div>' +
+          '<button class="btn accent sm" data-act="live" data-p="' + p.id + '">실전</button></div>';
+      }).join('') + '</div>';
+  }
+
+  if (!S.problems.length) {
+    h += '<div class="card pad" style="margin-bottom:20px;border-color:var(--accent)">' +
+      '<h2 style="font-size:16px;margin-bottom:6px">검증된 대표 유형 ' + CATALOG.length + '개가 들어 있습니다</h2>' +
+      '<p class="small" style="color:var(--ink-2);margin-bottom:12px">' +
+      'DFS·BFS·DP·다익스트라·KMP까지 코딩테스트 단골 유형의 파이썬 뼈대를 전부 담아뒀습니다. ' +
+      '하나하나 손으로 옮겨 적을 필요 없이, 하루 몇 개씩 풀지만 고르면 망각곡선 커리큘럼이 자동으로 깔립니다.</p>' +
+      '<div class="row"><button class="btn accent" data-act="go-pack">유형 팩 열기</button>' +
+      '<button class="btn" data-act="go-bank-new">내 문제 직접 등록</button></div></div>';
+  }
+
+  var fresh = S.problems.filter(function (p) {
+    return p.createdAt === T && !(p.attempts || []).length;
+  }).sort(function (a, b) { return ordOf(a) - ordOf(b); });
+  if (fresh.length) {
+    h += '<div class="sect-h"><h2>오늘 새로 외울 문제</h2><span class="sub">' + fresh.length + '개</span></div>' +
+      '<div class="qlist" style="margin-bottom:22px">' + fresh.map(function (p) {
+        return '<div class="qrow"><div class="meta"><div class="ttl">' + esc(p.title) + '</div>' +
+          '<div class="sub"><span class="chip">' + esc(p.category || '미분류') + '</span>' +
+          '<span class="muted">' + esc(p.brief || p.logic || '') + '</span></div></div>' +
+          '<button class="btn accent sm" data-act="train" data-p="' + p.id + '">훈련 시작</button></div>';
+      }).join('') + '</div>';
+  }
+
+  if (S.settings.gate) {
+    h += '<div class="card pad" style="margin-bottom:18px"><div class="row">' +
+      '<span class="chip accent">관문 모드 켜짐</span>' +
+      '<span class="small muted grow">오늘 통과할 관문이 없습니다. 복습 예정이 잡히거나 재확인 대상이 생기면 이 화면이 먼저 막힙니다.</span>' +
+      (S.settings.gateSkip ? '<span class="small muted">누적 회피 ' + S.settings.gateSkip + '회</span>' : '') +
+      '</div></div>';
+  }
+
+  h += '<div class="sect-h"><h2>오늘 복습할 문제</h2><span class="sub">' + due.length + '건</span><span class="grow"></span>' +
+    '<button class="btn sm" data-act="go-bank-new">+ 문제 등록</button></div>';
+
+  if (!due.length) {
+    h += '<div class="card empty"><span class="em">✓</span>오늘 예정된 복습이 없습니다.' +
+      (S.problems.length ? '' : '<br>유형 팩에서 시작하면 내일부터 복습이 뜹니다.') + '</div>';
+  } else {
+    h += '<div class="qlist">' + due.map(function (d) {
+      var total = (d.p.schedule || []).length;
+      var dots = (d.p.schedule || []).map(function (s, i) {
+        return '<i class="' + (s.done ? 'done' : (i === d.i ? 'now' : '')) + '"></i>';
+      }).join('');
+      return '<div class="qrow' + (d.late > 0 ? ' over' : '') + '">' +
+        '<div class="meta"><div class="ttl">' + esc(d.p.title) + '</div>' +
+        '<div class="sub"><span class="chip">' + esc(d.p.category || '미분류') + '</span>' +
+        '<span class="mono">' + (d.s.round) + '/' + total + '회차</span>' +
+        '<span class="rounds">' + dots + '</span>' +
+        (d.late > 0 ? '<span class="chip bad">' + d.late + '일 지연</span>' : '<span class="chip accent">오늘</span>') +
+        (d.s.retry ? '<span class="chip warn">재복습</span>' : '') +
+        '</div></div>' +
+        masteryChip(mastery(d.p)) +
+        '<button class="btn accent sm" data-act="live" data-p="' + d.p.id + '" data-i="' + d.i + '">실전</button>' +
+        (d.late > 0 ? '<button class="btn sm ghost" data-act="push" data-p="' + d.p.id + '" data-i="' + d.i + '" title="오늘로 이동">오늘로</button>' : '') +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  /* upcoming 7 days */
+  var up = [];
+  for (var k = 1; k <= 7; k++) { var ds = addDays(T, k); up.push({ d: ds, n: dueOn(ds) }); }
+  h += '<div class="card pad" style="margin-top:20px"><div class="sect-h"><h2>앞으로 7일</h2><span class="sub">예정된 복습량</span></div>' +
+    '<div class="hbars">' + up.map(function (u) {
+      var mx = Math.max.apply(null, up.map(function (x) { return x.n; }).concat([1]));
+      return '<div class="hb"><span class="muted">' + relDate(u.d) + '</span>' +
+        '<span class="track"><i style="width:' + (u.n / mx * 100) + '%"></i></span>' +
+        '<span class="v">' + u.n + '</span></div>';
+    }).join('') + '</div></div>';
+
+  return h;
+}
+
+function courseItems(c) { return CATALOG.filter(function (x) { return x.lv === c.lv; }); }
+function bySrcMap() {
+  var m = {};
+  S.problems.forEach(function (p) { if (p.srcId) m[p.srcId] = p; });
+  return m;
+}
+function courseStat(c) {
+  var items = courseItems(c), m = bySrcMap(), reg = 0, done = 0, drilled = 0;
+  items.forEach(function (it) {
+    var p = m[it.id];
+    if (!p) return;
+    reg++;
+    if ((p.attempts || []).length) drilled++;
+    if (mastery(p).k === 'done') done++;
+  });
+  return { items: items, map: m, n: items.length, reg: reg, done: done, drilled: drilled };
+}
+function itemState(p) {
+  if (!p) return { k: 'none', label: '미등록' };
+  var m = mastery(p);
+  if (m.k === 'done') return { k: 'done', label: '암기 완료' };
+  if (m.k === 'recheck') return { k: 'recheck', label: '재확인' };
+  if (m.k === 'near') return { k: 'near', label: m.label };
+  if ((p.attempts || []).length) return { k: 'wip', label: '연습 중' };
+  return { k: 'reg', label: '등록됨' };
+}
+function stateChip(st) {
+  var cls = st.k === 'done' ? 'accent' : (st.k === 'recheck' ? 'bad' : (st.k === 'near' ? 'warn' : ''));
+  return '<span class="chip ' + cls + '">' + (st.k === 'done' ? '✓ ' : '') + esc(st.label) + '</span>';
+}
+function packRegistered() {
+  var have = {};
+  S.problems.forEach(function (p) { if (p.srcId) have[p.srcId] = 1; });
+  return have;
+}
+function viewPack() {
+  if (S.courseSel) return viewCourseDetail();
+
+  var have = packRegistered();
+  var h = '<div class="sect-h"><h2>코스</h2><span class="sub">낮은 단계부터 순서대로</span></div>';
+
+  h += '<div class="stack-g" style="margin-bottom:22px">' + COURSES.map(function (c) {
+    var st = courseStat(c);
+    var days = Math.ceil(st.n / c.pace);
+    var pct = st.n ? st.done / st.n * 100 : 0;
+    var started = st.reg > 0;
+    var complete = st.done === st.n && st.n > 0;
+    return '<div class="course' + (complete ? ' done' : '') + '" data-act="course-open" data-c="' + c.id + '">' +
+      '<div class="row" style="align-items:flex-start">' +
+      '<div class="cnum mono">L' + c.lv + '</div>' +
+      '<div class="grow" style="min-width:0">' +
+      '<div class="row" style="gap:8px"><strong style="font-size:15.5px">' + esc(c.name) + '</strong>' +
+      '<span class="chip">' + esc(c.sub) + '</span>' +
+      (complete ? '<span class="chip accent">수료</span>' : (started ? '<span class="chip warn">진행 중</span>' : '')) +
+      '</div>' +
+      '<div class="small muted" style="margin-top:4px">' + esc(c.goal) + '</div>' +
+      '<div class="small mono muted" style="margin-top:6px">' +
+      st.n + '개 · 하루 ' + c.pace + '개면 ' + days + '일' +
+      (c.need ? ' · 선수 ' + esc(c.need) : '') + '</div>' +
+      '<div class="bar" style="margin-top:9px"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="small mono muted" style="margin-top:5px">등록 ' + st.reg + '/' + st.n +
+      ' · 암기 완료 ' + st.done + '/' + st.n + '</div>' +
+      '</div></div></div>';
+  }).join('') + '</div>';
+
+  /* 낱개로 고르기 */
+  h += '<details class="fold card pad"' + (S.packLv && S.packOpen ? ' open' : '') + '>' +
+    '<summary>코스 말고 낱개로 고르기 — 전체 ' + CATALOG.length + '개 유형</summary>' +
+    '<div style="margin-top:14px">' + packBrowser(have) + '</div></details>';
+  return h;
+}
+
+function packBrowser(have) {
+  var sel = Object.keys(S.packSel).filter(function (k) { return S.packSel[k]; });
+  var lv = S.packLv;
+  var pool = CATALOG.filter(function (c) { return !lv || c.lv === lv; });
+
+  var h = '<div class="lvtabs">' +
+    '<button class="lvtab' + (!lv ? ' on' : '') + '" data-act="pack-lv" data-l="0">전체 ' + CATALOG.length + '</button>' +
+    LEVELS.map(function (L) {
+      var all = CATALOG.filter(function (c) { return c.lv === L.n; });
+      var got = all.filter(function (c) { return have[c.id]; }).length;
+      return '<button class="lvtab' + (lv === L.n ? ' on' : '') + '" data-act="pack-lv" data-l="' + L.n + '">' +
+        esc(L.name) + ' <span class="mono">' + got + '/' + all.length + '</span></button>';
+    }).join('') + '</div>';
+
+  var per = clamp(S.packPerDay, 1, 10);
+  h += '<div class="row" style="margin-bottom:14px"><button class="btn sm" data-act="pack-all">보이는 것 전체 선택</button>' +
+    '<button class="btn sm ghost" data-act="pack-none">해제</button><span class="grow"></span>' +
+    '<label class="small muted" style="display:flex;align-items:center;gap:6px">하루' +
+    '<input type="number" id="pack-per" min="1" max="10" value="' + per + '" style="width:56px;padding:5px 8px">개</label>' +
+    '<button class="btn accent" data-act="pack-add"' + (sel.length ? '' : ' disabled') + '>' +
+    (sel.length ? sel.length + '개 등록' : '선택하세요') + '</button></div>';
+
+  var byCat = {}, order = [];
+  pool.forEach(function (c) {
+    var key = (lv ? '' : 'L' + c.lv + ' · ') + c.cat;
+    if (!byCat[key]) { byCat[key] = []; order.push(key); }
+    byCat[key].push(c);
+  });
+  h += order.map(function (key) {
+    var items = byCat[key];
+    return '<div style="margin-bottom:16px"><div class="sect-h"><h2 style="font-size:13.5px">' + esc(key) + '</h2>' +
+      '<span class="sub">' + items.length + '개</span></div>' +
+      items.map(function (c) {
+        var reg = !!have[c.id], on = !!S.packSel[c.id];
+        return '<div class="pk' + (reg ? ' reg' : '') + '">' +
+          '<div class="row" style="align-items:flex-start;flex-wrap:nowrap">' +
+          (reg ? '<span class="pkck done">✓</span>'
+            : '<span class="pkck' + (on ? ' on' : '') + '" data-act="pack-tog" data-c="' + c.id + '">' + (on ? '✓' : '') + '</span>') +
+          '<div class="grow" style="min-width:0">' +
+          '<div style="font-weight:500;font-size:14px">' + esc(c.title) +
+          (reg ? ' <span class="chip accent">등록됨</span>' : '') + '</div>' +
+          '<div class="small muted" style="margin-top:2px">' + esc(c.brief) + '</div>' +
+          '<details class="fold" style="margin-top:4px"><summary>코드 ' + c.code.split('\n').length + '줄</summary>' +
+          '<div class="hintbox" style="margin:8px 0">' + esc(c.logic) + '</div>' +
+          '<pre class="code">' + hl(c.code) + '</pre></details>' +
+          '</div></div></div>';
+      }).join('') + '</div>';
+  }).join('');
+  return h;
+}
+
+function viewCourseDetail() {
+  var c = COURSES.filter(function (x) { return x.id === S.courseSel; })[0];
+  if (!c) { S.courseSel = null; return viewPack(); }
+  var L = LEVELS[c.lv - 1];
+  var st = courseStat(c);
+  var pace = clamp(S.coursePace || c.pace, 1, 5);
+  var days = Math.ceil(st.n / pace);
+  var complete = st.done === st.n && st.n > 0;
+
+  var h = '<div class="row" style="margin-bottom:14px">' +
+    '<button class="btn ghost sm" data-act="back">← 코스 목록</button></div>';
+
+  h += '<div class="card pad" style="margin-bottom:16px">' +
+    '<div class="row" style="gap:8px;margin-bottom:8px">' +
+    '<span class="chip mono">L' + c.lv + '</span><span class="chip">' + esc(L.sub) + '</span>' +
+    (complete ? '<span class="chip accent">수료</span>' : (st.reg ? '<span class="chip warn">진행 중</span>' : '')) +
+    '</div>' +
+    '<h2 style="font-size:20px">' + esc(c.name) + '</h2>' +
+    '<div class="small muted" style="margin-top:2px">' + esc(c.sub) + '</div>' +
+    '<dl class="kv" style="margin-top:16px">' +
+    '<dt>배우는 것</dt><dd>' + esc(c.goal) + '</dd>' +
+    '<dt>끝나면</dt><dd>' + esc(c.after) + '</dd>' +
+    '<dt>선수 과정</dt><dd>' + esc(c.need || '없음 — 여기서 시작합니다') + '</dd>' +
+    '<dt>분량</dt><dd>' + st.n + '개 · 하루 ' + pace + '개 기준 ' + days + '일</dd>' +
+    '<dt>수료 기준</dt><dd>' + st.n + '개 전부 암기 완료 (각각 연속 ' + S.settings.streakNeed + '회 완벽 재현)</dd>' +
+    '</dl>' +
+    '<div class="bar" style="margin-top:16px"><i style="width:' + (st.n ? st.done / st.n * 100 : 0) + '%"></i></div>' +
+    '<div class="small mono muted" style="margin-top:6px">등록 ' + st.reg + '/' + st.n + ' · 암기 완료 ' + st.done + '/' + st.n + '</div>' +
+    (st.reg < st.n
+      ? '<div class="row" style="margin-top:16px">' +
+        '<label class="small muted" style="display:flex;align-items:center;gap:6px">하루' +
+        '<input type="number" id="c-pace" min="1" max="5" value="' + pace + '" style="width:56px;padding:5px 8px" data-live="pace">개</label>' +
+        '<button class="btn accent" data-act="course-start" data-c="' + c.id + '">' +
+        (st.reg ? '남은 ' + (st.n - st.reg) + '개 이어서 등록' : '코스 시작') + '</button>' +
+        '<span class="small muted">오늘부터 ' + Math.ceil((st.n - st.reg) / pace) + '일에 걸쳐 배치됩니다</span></div>'
+      : '<div class="row" style="margin-top:16px"><span class="chip accent">전부 등록됨</span>' +
+        '<span class="small muted">일정은 문제별로 잡혀 있습니다. 대시보드에서 오늘 차례를 확인하세요.</span></div>') +
+    '</div>';
+
+  /* 일차별 계획 */
+  h += '<div class="sect-h"><h2>일차별 진행</h2><span class="sub">배우는 순서 그대로</span></div>';
+  var dayIdx = 0;
+  h += '<div class="stack-g">';
+  for (var k = 0; k < st.items.length; k += pace) {
+    dayIdx++;
+    var group = st.items.slice(k, k + pace);
+    h += '<div class="card pad"><div class="sect-h"><h2 style="font-size:14px">' + dayIdx + '일차</h2>' +
+      '<span class="sub">' + group.length + '개 · ' +
+      group.reduce(function (a, x) { return a + x.code.split('\n').filter(function (l) { return l.trim(); }).length; }, 0) + '줄</span></div>' +
+      group.map(function (it) {
+        var pr = st.map[it.id];
+        var stt = itemState(pr);
+        return '<div class="pk"><div class="row" style="align-items:flex-start;flex-wrap:nowrap">' +
+          '<div class="grow" style="min-width:0">' +
+          '<div style="font-weight:500;font-size:14px">' + esc(it.title) + '</div>' +
+          '<div class="small muted" style="margin-top:2px">' + esc(it.brief) + '</div>' +
+          '<div class="row small" style="margin-top:6px">' +
+          '<span class="chip mono">' + it.code.split('\n').filter(function (l) { return l.trim(); }).length + '줄</span>' +
+          '<span class="chip">' + esc(it.cat) + '</span>' + stateChip(stt) +
+          (pr ? '<span class="chip mono">깜지 ' + (pr.trial || 1) + '회</span>' +
+            '<button class="btn sm ghost" data-act="train" data-p="' + pr.id + '">훈련</button>' +
+            '<button class="btn sm ghost" data-act="live" data-p="' + pr.id + '">실전</button>' : '') +
+          '</div>' +
+          (pr ? '' : '<details class="fold" style="margin-top:6px"><summary>미리보기 — 코드와 주의점</summary>' +
+            '<div class="hintbox" style="margin:8px 0">' + esc(it.logic) + '</div>' +
+            '<pre class="code">' + hl(it.code) + '</pre></details>') +
+          '</div></div></div>';
+      }).join('') + '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function startCourse(cid) {
+  var c = COURSES.filter(function (x) { return x.id === cid; })[0]; if (!c) return;
+  var st = courseStat(c);
+  var pace = clamp(parseInt(val('c-pace'), 10) || S.coursePace || c.pace, 1, 5);
+  S.coursePace = pace;
+  var todo = st.items.filter(function (it) { return !st.map[it.id]; });
+  if (!todo.length) { toast('이미 전부 등록되어 있습니다'); return; }
+  var base = today();
+  var objs = todo.map(function (it, i) {
+    var day = addDays(base, Math.floor(i / pace));
+    return {
+      id: uid(), srcId: it.id, category: it.cat, title: it.title, url: '',
+      limits: it.limits, brief: it.brief, logic: it.logic, code: it.code, lang: 'python',
+      createdAt: day, schedule: makeSchedule(day), attempts: [], streak: 0, masteredAt: null
+    };
+  });
+  putMany('problems', S.problems, objs);
+  S.courseSel = null;
+  goto('dash');
+  toast(c.name + ' 시작 — ' + objs.length + '개를 ' + Math.ceil(objs.length / pace) + '일에 배치했습니다');
+}
+
+function registerPack() {
+  var picked = CATALOG.filter(function (c) { return S.packSel[c.id]; });
+  if (!picked.length) { toast('선택된 유형이 없습니다'); return; }
+  var perDay = clamp(parseInt(val('pack-per'), 10) || S.packPerDay, 1, 10);
+  S.packPerDay = perDay;
+  var base = today();
+  var objs = picked.map(function (c, i) {
+    var day = addDays(base, Math.floor(i / perDay));
+    return {
+      id: uid(), srcId: c.id, category: c.cat, title: c.title, url: '',
+      limits: c.limits, brief: c.brief, logic: c.logic, code: c.code, lang: 'python',
+      createdAt: day, schedule: makeSchedule(day), attempts: []
+    };
+  });
+  S.packSel = {};
+  putMany('problems', S.problems, objs);
+  goto('dash');
+  toast(objs.length + '개 유형 등록 — 하루 ' + perDay + '개씩 ' + Math.ceil(objs.length / perDay) + '일 커리큘럼');
+}
+
+function problemForm() {
+  var p = S.form && S.form.id ? S.problems.filter(function (x) { return x.id === S.form.id; })[0] : null;
+  return '<div class="card pad" style="margin-bottom:16px">' +
+    '<div class="sect-h"><h2>' + (p ? '문제 수정' : '새 대표 문제 등록') + '</h2><span class="grow"></span>' +
+    '<button class="btn ghost sm" data-act="form-close">닫기</button></div>' +
+    '<div class="f2">' +
+    '<label class="f"><span>카테고리</span><input type="text" id="f-cat" list="catlist" value="' + esc(p ? p.category : '') + '" placeholder="DFS / DP / 그리디 …"></label>' +
+    '<label class="f"><span>언어</span><select id="f-lang">' + LANGS.map(function (l) {
+      return '<option value="' + l + '"' + (p && p.lang === l ? ' selected' : '') + '>' + LANG_LABEL[l] + '</option>';
+    }).join('') + '</select></label>' +
+    '</div>' +
+    '<label class="f"><span>문제 제목 *</span><input type="text" id="f-title" value="' + esc(p ? p.title : '') + '" placeholder="예: 백준 1926 그림"></label>' +
+    '<div class="f2">' +
+    '<label class="f"><span>문제 링크</span><input type="url" id="f-url" value="' + esc(p ? p.url : '') + '" placeholder="https://"></label>' +
+    '<label class="f"><span>학습 시작일</span><input type="date" id="f-base" value="' + esc(p ? p.createdAt : today()) + '"></label>' +
+    '</div>' +
+    '<label class="f"><span>제한 조건</span><input type="text" id="f-limit" value="' + esc(p ? p.limits : '') + '" placeholder="N ≤ 500, 시간 2초, 메모리 128MB"></label>' +
+    '<label class="f"><span>핵심 풀이 로직</span><textarea id="f-logic" placeholder="한 문장으로 요약: 방문 배열 + 큐로 BFS, 덩어리마다 크기 누적">' + esc(p ? p.logic : '') + '</textarea></label>' +
+    '<label class="f"><span>정답 전체 코드 *</span><textarea id="f-code" class="code" spellcheck="false" placeholder="통암기할 정답 코드를 그대로 붙여넣으세요">' + esc(p ? p.code : '') + '</textarea></label>' +
+    (p ? '<label class="row small" style="margin-bottom:12px"><input type="checkbox" id="f-regen" style="width:auto"> 복습 일정을 시작일 기준으로 다시 생성 (진행 기록 초기화)</label>' : '') +
+    '<div class="row"><button class="btn accent" data-act="form-save">' + (p ? '수정 저장' : '등록하고 주기 생성') + '</button>' +
+    '<span class="small muted">등록 시 ' + S.settings.intervals.join('·') + '일 후 복습 일정이 자동 생성됩니다.</span></div>' +
+    '<datalist id="catlist">' + CATS.map(function (c) { return '<option value="' + c + '">'; }).join('') + '</datalist>' +
+    '</div>';
+}
+
+function viewBank() {
+  var h = '<div class="sect-h"><h2>문제 은행</h2><span class="sub">' + S.problems.length + '문제</span>' +
+    '<span class="grow"></span><button class="btn accent sm" data-act="form-open">+ 새 문제</button></div>';
+  if (S.form) h += problemForm();
+
+  var cats = {};
+  S.problems.forEach(function (p) { cats[p.category || '미분류'] = 1; });
+  h += '<div class="filters">' +
+    '<input type="text" id="q" placeholder="제목 검색" value="' + esc(S.filter.q) + '" data-live="q">' +
+    '<select id="qsort" data-live="sort">' +
+    [['lv', '난이도순'], ['due', '복습 임박순'], ['weak', '취약한 순'], ['recent', '최근 등록순']].map(function (o) {
+      return '<option value="' + o[0] + '"' + (S.settings.bankSort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+    }).join('') + '</select>' +
+    '<select id="qlv" data-live="lv"><option value="">전체 난이도</option>' +
+    LEVELS.map(function (L) {
+      return '<option value="' + L.n + '"' + (S.filter.lv == L.n ? ' selected' : '') + '>' + esc(L.name) + '</option>';
+    }).join('') + '</select>' +
+    '<select id="qcat" data-live="cat"><option value="">전체 카테고리</option>' +
+    Object.keys(cats).sort().map(function (c) {
+      return '<option value="' + esc(c) + '"' + (S.filter.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>';
+    }).join('') + '</select></div>';
+
+  var lvOf = {};
+  CATALOG.forEach(function (c) { lvOf[c.id] = c.lv; });
+  var list = S.problems.filter(function (p) {
+    if (S.filter.lv && String(lvOf[p.srcId] || '') !== String(S.filter.lv)) return false;
+    if (S.filter.cat && (p.category || '미분류') !== S.filter.cat) return false;
+    if (S.filter.q && String(p.title).toLowerCase().indexOf(S.filter.q.toLowerCase()) < 0) return false;
+    return true;
+  });
+  var SORTS = {
+    lv: function (a, b) { return ordOf(a) - ordOf(b) || (a.createdAt || '').localeCompare(b.createdAt || ''); },
+    recent: function (a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); },
+    due: function (a, b) {
+      var x = nextDue(a) || '9999-99-99', y = nextDue(b) || '9999-99-99';
+      return x < y ? -1 : (x > y ? 1 : ordOf(a) - ordOf(b));
+    },
+    weak: function (a, b) {
+      var x = avgRate(a), y = avgRate(b);
+      return (x == null ? 101 : x) - (y == null ? 101 : y) || ordOf(a) - ordOf(b);
+    }
+  };
+  list.sort(SORTS[S.settings.bankSort] || SORTS.lv);
+
+  if (!list.length) {
+    h += '<div class="card empty"><span class="em">▤</span>' +
+      (S.problems.length ? '조건에 맞는 문제가 없습니다.' : '아직 등록된 문제가 없습니다. 오늘 암기할 대표 문제 하나를 등록해 보세요.') + '</div>';
+  } else {
+    h += '<div class="plist">' + list.map(function (p) {
+      var sc = p.schedule || [], done = sc.filter(function (s) { return s.done; }).length;
+      var r = avgRate(p), nd = nextDue(p);
+      return '<div class="prow" data-act="select" data-p="' + p.id + '">' +
+        '<div class="meta"><div class="ttl">' + esc(p.title) + '</div>' +
+        '<div class="sub">' +
+        (lvOf[p.srcId] ? '<span class="chip mono">L' + lvOf[p.srcId] + ' ' + esc(LEVELS[lvOf[p.srcId] - 1].name) + '</span>' : '') +
+        '<span class="chip">' + esc(p.category || '미분류') + '</span>' +
+        '<span class="rounds">' + sc.map(function (s) { return '<i class="' + (s.done ? 'done' : '') + '"></i>'; }).join('') + '</span>' +
+        '<span class="mono">' + done + '/' + sc.length + '</span>' +
+        (nd ? '<span>다음 ' + relDate(nd) + '</span>' : '<span class="chip accent">주기 완료</span>') +
+        '</div></div>' +
+        masteryChip(mastery(p)) +
+        '<span class="rate ' + rateClass(r) + '">' + (r == null ? '—' : r + '%') + '</span></div>' +
+        (S.sel === p.id ? problemDetail(p) : '');
+    }).join('') + '</div>';
+  }
+  return h;
+}
+
+function problemDetail(p) {
+  var sc = p.schedule || [];
+  var nextIdx = -1;
+  sc.forEach(function (x, i) { if (nextIdx < 0 && !x.done) nextIdx = i; });
+  return '<div class="card pad detail">' +
+    '<div class="row" style="margin-bottom:12px"><span class="chip accent">' + esc(p.category || '미분류') + '</span>' +
+    '<span class="chip mono">' + esc(LANG_LABEL[p.lang] || p.lang || 'Python') + '</span>' +
+    '<span class="grow"></span>' +
+    masteryChip(mastery(p)) +
+    '<span class="chip mono">깜지 ' + (p.trial || 1) + '회</span>' +
+    '<button class="btn sm accent" data-act="train" data-p="' + p.id + '">훈련</button>' +
+    '<button class="btn sm" data-act="live" data-p="' + p.id + '">실전</button></div>' +
+    '<dl class="kv">' +
+    (p.brief ? '<dt>문제 설명</dt><dd>' + esc(p.brief) + '</dd>' : '') +
+    (p.url ? '<dt>문제 링크</dt><dd><a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.url) + '</a></dd>' : '') +
+    (p.limits ? '<dt>제한 조건</dt><dd>' + esc(p.limits) + '</dd>' : '') +
+    (p.logic ? '<dt>핵심 로직</dt><dd style="white-space:pre-wrap">' + esc(p.logic) + '</dd>' : '') +
+    '<dt>등록일</dt><dd class="mono">' + esc(p.createdAt) + '</dd>' +
+    '</dl>' +
+    '<hr class="sep"><div class="sect-h"><h2 style="font-size:14px">복습 일정</h2></div>' +
+    '<div class="hbars">' + sc.map(function (s, i) {
+      var st = s.done ? '<span class="chip accent">완료 ' + (s.rate != null ? s.rate + '%' : '') + '</span>'
+        : (dayDiff(s.due, today()) > 0 ? '<span class="chip bad">지연</span>'
+          : (s.due === today() ? '<span class="chip warn">오늘</span>' : '<span class="chip">예정</span>'));
+      return '<div class="row small" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">' +
+        '<span class="mono">' + s.round + '회차' + (s.retry ? ' (재)' : '') + '</span>' +
+        '<span class="mono muted">' + esc(s.due) + '</span>' + st +
+        (i === nextIdx ? '<button class="btn sm" data-act="live" data-p="' + p.id + '" data-i="' + i + '">실전</button>' : '') +
+        '</div>';
+    }).join('') + '</div>' +
+    '<hr class="sep">' +
+    ((p.attempts || []).length ? '<details class="fold"><summary>테스트 기록 ' + p.attempts.length + '회</summary><div class="hbars" style="margin-top:8px">' +
+      p.attempts.slice().reverse().slice(0, 12).map(function (a) {
+        return '<div class="hb"><span class="mono muted">' + esc(a.at) + '</span>' +
+          '<span class="track"><i class="' + (a.rate >= S.settings.pass ? '' : (a.rate >= 60 ? 'w' : 'b')) + '" style="width:' + a.rate + '%"></i></span>' +
+          '<span class="v">' + a.rate + '%</span></div>';
+      }).join('') + '</div></details>' : '') +
+    '<hr class="sep"><div class="row">' +
+    '<span class="small muted grow">코드를 자기 스타일로 바꾸고 싶을 때만 쓰세요</span>' +
+    '<button class="btn sm ghost" data-act="form-edit" data-p="' + p.id + '">코드 수정</button>' +
+    '<button class="btn sm ghost danger" data-act="del-p" data-p="' + p.id + '">삭제</button></div>' +
+    '</div>';
+}
+
+function viewTest() {
+  var t = S.test; if (!t) return '';
+  var p = S.problems.filter(function (x) { return x.id === t.pid; })[0];
+  if (!p) return '<div class="card empty">문제를 찾을 수 없습니다.</div>';
+  var lim = timeLimit(p);
+
+  if (!t.result) {
+    var modeLabel = t.gate ? '오늘의 관문' : (t.idx != null ? t.round + '회차 복습' : '실전');
+    return '<div class="testhead">' +
+      '<button class="btn ghost sm" data-act="test-exit">← 나가기</button>' +
+      '<div class="grow"><h2>' + esc(p.title) + '</h2>' +
+      '<div class="small muted"><span class="chip">' + esc(p.category || '미분류') + '</span> ' +
+      esc(modeLabel) + ' · 원본 ' + normLines(p) + '줄 · 제한 ' + mmss(lim) + '</div></div>' +
+      '<div class="timer mono" id="timer">00:00</div></div>' +
+      '<div class="hintbox" style="border-style:solid;border-color:var(--bad);color:var(--bad)">' +
+      '실전입니다. 100% 재현 + 구조 누락 0 + 제한 시간 내여야 통과입니다. 막히면 아래 모르겠다를 누르세요.</div>' +
+      '<div class="editor-wrap"><div class="gutter" id="gutter">1</div>' +
+      '<textarea id="codeInput" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="빈 화면에서 정답 코드를 처음부터 끝까지 작성하세요."></textarea></div>' +
+      '<div class="editbar"><span id="counter" class="mono">0줄 · 0자</span><span class="grow"></span>' +
+      '<span>Tab 들여쓰기 · Ctrl/⌘+Enter 제출</span>' +
+      '<button class="btn danger" data-act="giveup">모르겠다</button>' +
+      '<button class="btn accent" data-act="submit">제출하고 채점</button></div>';
+  }
+
+  var r = t.result, v = t.verdict, m = mastery(p);
+  var nextStreak = v.perfect ? (p.streak || 0) + 1 : 0;
+  var h = '<div class="testhead"><button class="btn ghost sm" data-act="test-exit">← 나가기</button>' +
+    '<div class="grow"><h2>' + esc(p.title) + '</h2><div class="small muted">' +
+    mmss(t.elapsed) + ' 소요 · 제한 ' + mmss(v.lim) + '</div></div></div>';
+
+  /* ---- 암기 판정 ---- */
+  h += '<div class="card pad verdict-card ' + (v.perfect ? 'ok' : 'no') + '" style="margin-bottom:14px">' +
+    '<div class="row" style="align-items:center;gap:14px">' +
+    '<div class="stamp ' + (v.perfect ? 'ok' : 'no') + '">' + (v.perfect ? '암기<br>확인' : '아직') + '</div>' +
+    '<div class="grow"><h2 style="font-size:17px">' +
+    (v.perfect ? '완벽 재현했습니다' : '완벽 재현이 아닙니다') + '</h2>' +
+    '<div class="small muted" style="margin-top:2px">' +
+    (v.perfect
+      ? (nextStreak >= S.settings.streakNeed
+        ? '연속 ' + nextStreak + '회 — 이 문제는 암기 완료로 올라갑니다.'
+        : '연속 ' + nextStreak + '/' + S.settings.streakNeed + ' — ' + (S.settings.streakNeed - nextStreak) + '회 더 완벽하면 암기 완료입니다.')
+      : '네 조건 중 하나라도 어긋나면 연속 기록은 0으로 돌아갑니다. 현재 연속 ' + (p.streak || 0) + '회.') +
+    '</div></div></div>' +
+    '<div class="checklist" style="margin-top:14px">' +
+    [['일치율 100%', r.rate >= 100, r.rate + '%'],
+     ['핵심 구조 누락 없음', v.missing === 0, v.missing + '개 누락'],
+     ['제한 시간 내', t.elapsed <= v.lim, mmss(t.elapsed) + ' / ' + mmss(v.lim)]
+    ].map(function (row) {
+      return '<div class="ck ' + (row[1] ? 'ok' : 'no') + '"><span class="s">' + (row[1] ? '✓' : '✕') + '</span>' +
+        '<span class="grow">' + esc(row[0]) + '</span><span class="mono small">' + esc(row[2]) + '</span></div>';
+    }).join('') + '</div>' +
+    '<div class="row" style="margin-top:14px">' +
+    (v.perfect
+      ? '<button class="btn accent" data-act="record">' + (t.idx != null ? '복습 완료 처리' : '판정 반영') + '</button>' +
+        '<button class="btn" data-act="retry">다시 풀기</button>'
+      : '<button class="btn accent" data-act="retrain">깜지 ' +
+        Math.min(S.settings.trialMax, (p.trial || 1) + 1) + '회부터 다시</button>' +
+        '<button class="btn" data-act="record">기록만 남기고 나가기</button>') +
+    '<span class="grow"></span><span class="small muted">현재 상태 ' + esc(m.label) + '</span></div>' +
+    '</div>';
+
+  /* ---- 일치율 상세 ---- */
+  var pass = r.rate >= S.settings.pass;
+  h += '<div class="card pad" style="margin-bottom:14px"><div class="score">' +
+    '<div><div class="num" style="color:' + (r.rate >= 100 ? 'var(--good)' : (pass ? 'var(--warn)' : 'var(--bad)')) + '">' +
+    r.rate + '<em>%</em></div><div class="small muted mono">구조 일치율</div></div>' +
+    '<div class="grow"><div class="small muted mono">원본 ' + r.origLines + '줄 · 입력 ' + r.userLines + '줄 · 일치 ' + r.matched + '줄</div>' +
+    '<div class="bar ' + (r.rate >= 100 ? '' : (pass ? 'warn' : 'bad')) + '"><i style="width:' + r.rate + '%"></i></div></div>' +
+    '</div></div>';
+
+  var bad = r.checks.filter(function (c) { return !c.ok; });
+  h += '<div class="card pad" style="margin-bottom:14px"><div class="sect-h"><h2>핵심 구조 검증</h2>' +
+    '<span class="sub">' + (bad.length ? bad.length + '개 누락' : '누락 없음') + '</span></div>' +
+    '<div class="checklist">' + r.checks.map(function (c) {
+      return '<div class="ck ' + (c.ok ? 'ok' : 'no') + '"><span class="s">' + (c.ok ? '✓' : '✕') + '</span>' +
+        '<span class="grow">' + esc(c.k) + '</span><span class="mono small">' + c.got + '/' + c.need + '</span></div>';
+    }).join('') + '</div></div>';
+
+  if (r.tags.length) {
+    h += '<div class="card pad" style="margin-bottom:14px"><div class="sect-h"><h2>이번 결함 패턴</h2></div><div class="row">' +
+      r.tags.map(function (x) { return '<span class="chip bad">' + esc(x.k) + ' ' + x.n + '</span>'; }).join('') + '</div></div>';
+  }
+
+  h += '<div class="sect-h"><h2>라인 비교</h2><span class="sub">공백·주석은 무시하고 구조만 대조합니다</span></div>' +
+    '<div class="difflist scroller">' + r.rows.map(function (row) {
+      var mk = row.k === 'same' ? ' ' : (row.k === 'miss' ? '−' : '+');
+      var ind = row.d ? '<span class="ind">' + '·   '.repeat(row.d) + '</span>' : '';
+      var body = row.html != null ? row.html : esc(row.t);
+      return '<div class="dl ' + row.k + '"><span class="mk">' + mk + '</span><span class="tx">' + ind + body + '</span></div>';
+    }).join('') + '</div>' +
+    '<div class="small muted" style="margin-top:8px">− 원본에 있는데 쓰지 못한 줄 · + 원본에 없는 줄</div>';
+  return h;
+}
+
+function viewDrill() {
+  var dr = S.drill; if (!dr) return '';
+  var p = S.problems.filter(function (x) { return x.id === dr.pid; })[0];
+  if (!p) return '<div class="card empty">문제를 찾을 수 없습니다.</div>';
+
+  return '<div class="testhead">' +
+    '<button class="btn ghost sm" data-act="back">← 나가기</button>' +
+    '<div class="grow"><h2>' + esc(p.title) + '</h2>' +
+    '<div class="small muted"><span class="chip">깜지</span> ' +
+    '<span class="chip mono">' + traceLines(dr.target) + '줄</span> ' +
+    '베껴 쓰기 · 통과하면 바로 실전으로 넘어갑니다</div></div>' +
+    '<div class="timer mono">' + (dr.done + 1) + '<span style="font-size:14px;color:var(--ink-3)">/' + dr.need + '</span></div>' +
+    '</div>' +
+    '<div class="bar" style="margin-bottom:6px"><i id="traceBar" style="width:0%"></i></div>' +
+    '<div class="editbar" style="margin:0 0 12px">' +
+    '<span id="traceStat" class="mono">0%</span><span class="grow"></span>' +
+    '<span class="muted">들여쓰기는 자동으로 넘어갑니다 · 영문 입력 상태로</span></div>' +
+    '<div class="hintbox" id="traceWarn" style="display:none;margin-bottom:10px"></div>' +
+    '<div class="tracebox" id="tracebox" data-act="trace-focus">' +
+    '<pre class="traceview" id="traceview"></pre>' +
+    '<textarea class="tracein" id="tracein" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off"></textarea>' +
+    '</div>' +
+    (dr.pos >= dr.target.length
+      ? '<div class="row" style="margin-top:14px"><button class="btn accent" data-act="drill-next">' +
+        (dr.done + 1 >= dr.need ? '실전으로 넘어가기' : '다음 회차로') + '</button>' +
+        '<span class="small muted">다 채웠습니다</span></div>'
+      : '') +
+    '<p class="small muted" style="margin-top:12px">회색 글자 위로 그대로 따라 치세요. 틀린 글자는 들어가지 않습니다. ' +
+    (dr.need > 1 ? '이번 문제는 실전에서 ' + (dr.need - 1) + '번 막혀서 ' + dr.need + '회입니다.' : '') + '</p>';
+}
+
+function viewBooks() {
+  var T = today();
+  var h = '<div class="sect-h"><h2>독서 진도</h2><span class="sub">' + S.books.length + '권</span><span class="grow"></span>' +
+    '<button class="btn sm" data-act="book-new">+ 책 추가</button></div>';
+
+  if (S.bookForm) {
+    h += '<div class="card pad" style="margin-bottom:14px"><div class="f3">' +
+      '<label class="f"><span>책 제목</span><input type="text" id="b-title" placeholder="자기관리론 — 데일 카네기"></label>' +
+      '<label class="f"><span>총 페이지</span><input type="number" id="b-total" min="1" placeholder="380"></label>' +
+      '<label class="f"><span>현재 페이지</span><input type="number" id="b-cur" min="0" value="0"></label></div>' +
+      '<div class="row"><button class="btn accent" data-act="book-save">추가</button>' +
+      '<button class="btn ghost" data-act="book-cancel">취소</button></div></div>';
+  }
+
+  if (!S.books.length) {
+    h += '<div class="card empty"><span class="em">▭</span>읽고 있는 책을 등록하면 진도율과 인사이트를 함께 관리합니다.</div>';
+  } else {
+    h += '<div class="bookgrid">' + S.books.map(function (b) {
+      var pct = b.total ? clamp(Math.round(b.current / b.total * 100), 0, 100) : 0;
+      var doneFlag = b.status === 'done' || (b.total && b.current >= b.total);
+      return '<div class="book"><div class="row" style="align-items:flex-start">' +
+        '<div class="grow"><strong>' + esc(b.title) + '</strong>' +
+        '<div class="small muted mono">' + (b.current || 0) + ' / ' + (b.total || '?') + ' p</div></div>' +
+        (doneFlag ? '<span class="chip accent">완독</span>' : '<span class="chip">진행 중</span>') + '</div>' +
+        '<div class="bar warn" style="margin-top:10px"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="row" style="margin-top:10px">' +
+        '<span class="mono small muted">' + pct + '%</span><span class="grow"></span>' +
+        '<input type="number" min="0" id="pg-' + b.id + '" value="' + (b.current || 0) + '" style="width:84px;padding:5px 8px">' +
+        '<button class="btn sm" data-act="book-page" data-b="' + b.id + '">기록</button>' +
+        '<button class="btn sm ghost danger" data-act="book-del" data-b="' + b.id + '">삭제</button></div>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  h += '<div class="sect-h" style="margin-top:24px"><h2>인사이트 기록</h2><span class="sub">' + S.insights.length + '개</span>' +
+    '<span class="grow"></span><button class="btn sm accent" data-act="ins-new">+ 기록</button></div>';
+
+  if (S.insForm) {
+    h += '<div class="card pad" style="margin-bottom:14px">' +
+      '<div class="f2"><label class="f"><span>책</span><select id="i-book">' +
+      S.books.map(function (b) { return '<option value="' + b.id + '">' + esc(b.title) + '</option>'; }).join('') +
+      '<option value="">(책 없이 기록)</option></select></label>' +
+      '<label class="f"><span>페이지</span><input type="number" id="i-page" min="0" placeholder="선택"></label></div>' +
+      '<label class="f"><span>핵심 문장 / 느낀 점</span><textarea id="i-text" placeholder="오늘 붙잡을 한 문장과, 그것을 내 상황에 어떻게 적용할지"></textarea></label>' +
+      '<div class="row"><button class="btn accent" data-act="ins-save">저장</button>' +
+      '<button class="btn ghost" data-act="ins-cancel">취소</button></div></div>';
+  }
+
+  var ins = S.insights.slice().sort(function (a, b) { return (b.date + b.id).localeCompare(a.date + a.id); });
+  if (!ins.length) {
+    h += '<div class="card empty"><span class="em">❞</span>아직 기록된 인사이트가 없습니다.</div>';
+  } else {
+    var byDate = {};
+    ins.forEach(function (i) { (byDate[i.date] = byDate[i.date] || []).push(i); });
+    h += '<div class="card pad">' + Object.keys(byDate).sort().reverse().map(function (d) {
+      return '<div style="margin-bottom:18px"><div class="small mono muted" style="margin-bottom:8px">' + esc(d) + (d === T ? ' · 오늘' : '') + '</div>' +
+        byDate[d].map(function (i) {
+          var bk = S.books.filter(function (b) { return b.id === i.bookId; })[0];
+          return '<div class="ins"><div class="q">' + esc(i.text) + '</div>' +
+            '<div class="m">' + (bk ? esc(bk.title) : '기타') + (i.page ? ' · p.' + i.page : '') +
+            ' <button class="btn sm ghost danger" data-act="ins-del" data-i="' + i.id + '" style="padding:0 6px">삭제</button></div></div>';
+        }).join('') + '</div>';
+    }).join('') + '</div>';
+  }
+  return h;
+}
+
+function viewStats() {
+  var T = today(), days = [], i;
+  for (i = 13; i >= 0; i--) { var d = addDays(T, -i); days.push({ d: d, due: dueOn(d), done: doneOn(d) }); }
+  var mx = Math.max.apply(null, days.map(function (x) { return Math.max(x.due, x.done); }).concat([1]));
+  var rated = days.filter(function (x) { return x.due > 0; });
+  var avgAch = rated.length ? Math.round(rated.reduce(function (a, x) { return a + Math.min(1, x.done / x.due); }, 0) / rated.length * 100) : 0;
+
+  var allAtt = [];
+  S.problems.forEach(function (p) { (p.attempts || []).forEach(function (a) { allAtt.push(a); }); });
+  var passN = allAtt.filter(function (a) { return a.rate >= S.settings.pass; }).length;
+  var passRate = allAtt.length ? Math.round(passN / allAtt.length * 100) : 0;
+
+  var done = masteredCount();
+  var h = '<div class="statgrid" style="margin-bottom:18px">' +
+    tile('암기 완료', done, '개', '전체 ' + S.problems.length + '개 중',
+      S.problems.length ? done / S.problems.length * 100 : 0) +
+    tile('최근 14일 평균 달성률', avgAch, '%', '예정 대비 완료', avgAch) +
+    tile('테스트 통과율', passRate, '%', allAtt.length + '회 중 ' + passN + '회', passRate) +
+    tile('복습 누락', overdueCount(), '건', '기한이 지난 미완료', overdueCount() ? 100 : 0, overdueCount() ? 'bad' : '') +
+    tile('등록 문제', S.problems.length, '개', '누적 대표 문제', 100) +
+    '</div>';
+
+  h += '<div class="card pad" style="margin-bottom:16px"><div class="sect-h"><h2>일일 학습 달성</h2>' +
+    '<span class="sub">최근 14일 · 완료 건수</span></div><div class="chart">' +
+    days.map(function (x) {
+      var full = x.due > 0 && x.done >= x.due;
+      var cls = x.done === 0 ? 'zero' : (full ? '' : 'part');
+      var hgt = Math.max(2, x.done / mx * 100);
+      return '<div class="col"><div class="stack"><div class="b ' + cls + '" style="height:' + hgt + '%" title="' + x.d + ' 완료 ' + x.done + ' / 예정 ' + x.due + '"></div></div>' +
+        '<div class="cl">' + x.d.slice(8) + '</div></div>';
+    }).join('') + '</div><div class="small muted" style="margin-top:6px">초록: 예정분 전량 완료 · 주황: 일부 완료 · 회색: 완료 없음</div></div>';
+
+  /* 필사량 */
+  var wmax = Math.max.apply(null, days.map(function (x) { return dayLines(x.d); }).concat([1]));
+  var wsum = days.reduce(function (a, x) { return a + dayLines(x.d); }, 0);
+  h += '<div class="card pad" style="margin-bottom:16px"><div class="sect-h"><h2>하루에 쓴 줄</h2>' +
+    '<span class="sub">최근 14일 합계 ' + wsum + '줄 · 연속 ' + writeStreak() + '일</span></div><div class="chart">' +
+    days.map(function (x) {
+      var v = dayLines(x.d);
+      return '<div class="col"><div class="stack"><div class="b ' + (v ? 'part' : 'zero') +
+        '" style="height:' + Math.max(2, v / wmax * 100) + '%" title="' + x.d + ' ' + v + '줄"></div></div>' +
+        '<div class="cl">' + x.d.slice(8) + '</div></div>';
+    }).join('') + '</div>' +
+    '<div class="small muted" style="margin-top:6px">깜지와 테스트에서 실제로 입력한 줄을 매일 00시에 새로 셉니다.</div></div>';
+
+  /* category */
+  var cat = {};
+  S.problems.forEach(function (p) {
+    var c = p.category || '미분류';
+    cat[c] = cat[c] || { n: 0, sum: 0, cnt: 0 };
+    cat[c].n++;
+    (p.attempts || []).forEach(function (a) { cat[c].sum += a.rate; cat[c].cnt++; });
+  });
+  var catKeys = Object.keys(cat).sort(function (a, b) { return cat[b].n - cat[a].n; });
+  h += '<div class="card pad" style="margin-bottom:16px"><div class="sect-h"><h2>카테고리별 평균 일치율</h2>' +
+    '<span class="sub">막대 길이 = 평균 일치율</span></div>';
+  h += catKeys.length ? '<div class="hbars">' + catKeys.map(function (c) {
+    var v = cat[c].cnt ? Math.round(cat[c].sum / cat[c].cnt) : 0;
+    var cls = v >= S.settings.pass ? '' : (v >= 60 ? 'w' : 'b');
+    return '<div class="hb"><span>' + esc(c) + ' <span class="muted mono">' + cat[c].n + '</span></span>' +
+      '<span class="track"><i class="' + cls + '" style="width:' + v + '%"></i></span>' +
+      '<span class="v">' + (cat[c].cnt ? v + '%' : '—') + '</span></div>';
+  }).join('') + '</div>' : '<div class="empty">데이터가 없습니다.</div>';
+  h += '</div>';
+
+  /* defect patterns */
+  var tg = {};
+  allAtt.forEach(function (a) { (a.tags || []).forEach(function (t) { tg[t.k] = (tg[t.k] || 0) + t.n; }); });
+  var tk = Object.keys(tg).sort(function (a, b) { return tg[b] - tg[a]; }).slice(0, 8);
+  var tmx = tk.length ? tg[tk[0]] : 1;
+  h += '<div class="card pad" style="margin-bottom:16px"><div class="sect-h"><h2>자주 틀리는 코드 블록</h2>' +
+    '<span class="sub">누적 결함 패턴</span></div>';
+  h += tk.length ? '<div class="hbars">' + tk.map(function (k) {
+    return '<div class="hb"><span>' + esc(k) + '</span><span class="track"><i class="b" style="width:' + (tg[k] / tmx * 100) + '%"></i></span>' +
+      '<span class="v">' + tg[k] + '</span></div>';
+  }).join('') + '</div>' : '<div class="empty">테스트를 제출하면 결함 패턴이 쌓입니다.</div>';
+  h += '</div>';
+
+  /* mastery by level */
+  var lvMap = {};
+  CATALOG.forEach(function (c) { lvMap[c.id] = c.lv; });
+  var byLv = {};
+  S.problems.forEach(function (p) {
+    var lv = lvMap[p.srcId] || 0;
+    byLv[lv] = byLv[lv] || { n: 0, done: 0 };
+    byLv[lv].n++;
+    if (mastery(p).k === 'done') byLv[lv].done++;
+  });
+  var lvKeys = Object.keys(byLv).sort();
+  if (lvKeys.length) {
+    h += '<div class="card pad" style="margin-bottom:16px"><div class="sect-h"><h2>난이도별 암기 진척</h2></div><div class="hbars">' +
+      lvKeys.map(function (k) {
+        var L = LEVELS[parseInt(k, 10) - 1];
+        var nm = L ? L.name : '직접 등록';
+        var v = byLv[k].n ? byLv[k].done / byLv[k].n * 100 : 0;
+        return '<div class="hb"><span>' + esc(nm) + '</span><span class="track"><i style="width:' + v + '%"></i></span>' +
+          '<span class="v">' + byLv[k].done + '/' + byLv[k].n + '</span></div>';
+      }).join('') + '</div>' +
+      (S.settings.gateSkip ? '<div class="small muted" style="margin-top:10px">관문 회피 누적 ' + S.settings.gateSkip + '회</div>' : '') +
+      '</div>';
+  }
+
+  /* weakest problems */
+  var weak = S.problems.filter(function (p) { return avgRate(p) != null; })
+    .sort(function (a, b) { return avgRate(a) - avgRate(b); }).slice(0, 6);
+  if (weak.length) {
+    h += '<div class="card pad"><div class="sect-h"><h2>보강이 필요한 문제</h2><span class="sub">평균 일치율 하위</span></div><div class="hbars">' +
+      weak.map(function (p) {
+        var r = avgRate(p);
+        return '<div class="hb"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(p.title) + '">' + esc(p.title) + '</span>' +
+          '<span class="track"><i class="' + rateClass(r) + '" style="width:' + r + '%"></i></span><span class="v">' + r + '%</span></div>';
+      }).join('') + '</div></div>';
+  }
+  return h;
+}
+
+function viewSettings() {
+  var st = S.settings;
+  var h = '<div class="stack-g">';
+  h += '<div class="card pad"><div class="sect-h"><h2>망각곡선 주기</h2><span class="sub">등록일로부터 며칠 뒤에 복습할지</span></div>' +
+    '<label class="f"><span>복습 간격 (일, 쉼표로 구분)</span><input type="text" id="s-int" value="' + esc(st.intervals.join(', ')) + '"></label>' +
+    '<div class="row small muted">기본값 1, 3, 7, 14, 30 — 회차가 늘수록 간격이 벌어지는 에빙하우스 곡선을 따릅니다. 변경해도 이미 등록된 문제의 일정은 유지됩니다.</div></div>';
+
+  h += '<div class="card pad"><div class="sect-h"><h2>채점 기준</h2></div>' +
+    '<div class="f2"><label class="f"><span>통과 일치율 (%)</span><input type="number" id="s-pass" min="10" max="100" value="' + st.pass + '"></label>' +
+    '<label class="f"><span>실패 시 재복습</span><select id="s-retry">' +
+    '<option value="1"' + (st.retry ? ' selected' : '') + '>기준 미달이면 다음 날 재복습 추가</option>' +
+    '<option value="0"' + (st.retry ? '' : ' selected') + '>추가하지 않음</option></select></label></div></div>';
+
+  h += '<div class="card pad"><div class="sect-h"><h2>암기 판정</h2>' +
+    '<span class="sub">"정말 다 외웠는가"의 기준</span></div>' +
+    '<p class="small" style="color:var(--ink-2);margin-bottom:14px">일치율 100% + 구조 누락 0 + 힌트 미사용 + 제한 시간 내, ' +
+    '이 넷을 모두 만족한 회차만 완벽 재현으로 칩니다. 하나라도 어긋나면 연속 기록은 0이 됩니다.</p>' +
+    '<div class="f3"><label class="f"><span>연속 몇 회면 암기 완료</span><input type="number" id="s-streak" min="1" max="10" value="' + st.streakNeed + '"></label>' +
+    '<label class="f"><span>제한 시간 — 줄당 초</span><input type="number" id="s-spl" min="2" max="60" value="' + st.secPerLine + '"></label>' +
+    '<label class="f"><span>제한 시간 — 기본 여유 초</span><input type="number" id="s-base" min="0" max="300" value="' + st.baseSec + '"></label></div>' +
+    '<div class="f2"><label class="f"><span>암기 완료 후 재확인 (일)</span><input type="number" id="s-decay" min="7" max="180" value="' + st.decayDays + '"></label>' +
+    '<label class="f"><span>관문 모드</span><select id="s-gate">' +
+    '<option value="1"' + (st.gate ? ' selected' : '') + '>켜기 — 오늘 것을 통과하기 전엔 다른 화면이 안 열림</option>' +
+    '<option value="0"' + (st.gate ? '' : ' selected') + '>끄기</option></select></label></div></div>';
+
+  h += '<div class="card pad"><div class="sect-h"><h2>깜지</h2>' +
+    '<span class="sub">실패할수록 늘어납니다</span></div>' +
+    '<p class="small" style="color:var(--ink-2);margin-bottom:14px">깜지는 전체 코드를 보면서 그대로 베껴 쓰는 단계입니다. ' +
+    '처음에는 1회, 실전에서 막히거나 모르겠다를 누를 때마다 1회씩 늘어납니다. 실전을 통과하면 다시 1회로 돌아갑니다.</p>' +
+    '<label class="f"><span>깜지 최대 횟수</span><input type="number" id="s-tmax" min="2" max="20" value="' + st.trialMax + '"></label></div>';
+
+  h += '<div class="card pad"><div class="sect-h"><h2>일일 목표</h2></div>' +
+    '<div class="f2"><label class="f"><span>신규 문제 (개)</span><input type="number" id="s-new" min="0" max="20" value="' + st.newGoal + '"></label>' +
+    '<label class="f"><span>독서 (페이지)</span><input type="number" id="s-read" min="0" max="500" value="' + st.readGoal + '"></label></div></div>';
+
+  h += '<div class="card pad"><div class="row"><button class="btn accent" data-act="s-save">설정 저장</button>' +
+    '<span class="small muted">저장 위치: ' + (S.mode === 'cloud' ? '계정 저장소 (기기 간 동기화)' : '이 브라우저') + '</span></div></div>';
+
+  h += '<div class="card pad"><div class="sect-h"><h2>데이터</h2></div><div class="row">' +
+    '<button class="btn" data-act="sync-code">내장 코드 최신화</button>' +
+    '<button class="btn" data-act="copy-json">JSON 백업 복사</button>' +
+    (S.canImport ? '<button class="btn accent" data-act="import">로컬 기록 가져오기</button>' : '') +
+    '</div><div class="small muted" style="margin-top:8px">문제 ' + S.problems.length + '개 · 책 ' + S.books.length + '권 · 인사이트 ' + S.insights.length + '개</div></div>';
+
+  h += '</div>';
+  return h;
+}
+
+/* ============ render ============ */
+var VIEWS = { dash: viewDash, pack: viewPack, bank: viewBank, test: viewTest, drill: viewDrill, books: viewBooks, stats: viewStats, settings: viewSettings };
+function render() {
+  if (S.view !== 'test' && S.view !== 'drill' && gateProblem()) S.view = 'dash';
+  document.body.classList.toggle('gated', !!gateProblem() && S.view !== 'test' && S.view !== 'drill');
+  Object.keys(VIEWS).forEach(function (k) {
+    var el = document.getElementById('v-' + k);
+    if (k === S.view) { el.innerHTML = VIEWS[k](); el.classList.add('on'); }
+    else { el.classList.remove('on'); el.innerHTML = ''; }
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#nav button'), function (b) {
+    b.setAttribute('aria-current', b.dataset.v === S.view ? 'true' : 'false');
+  });
+  $('#backBtn').hidden = !S.hist.length;
+  var n = dueList().length, badge = $('#navDue');
+  badge.hidden = !n; badge.textContent = n;
+  $('#todayLabel').textContent = today() + ' · ' + ['일', '월', '화', '수', '목', '금', '토'][new Date().getDay()] + '요일';
+  if (S.view === 'test' && S.test && !S.test.result) wireEditor();
+  if (S.view === 'drill' && S.drill) wireDrill();
+}
+var _lastView = null;
+function toTop() { try { window.scrollTo(0, 0); } catch (e) { } }
+var HIST = { ok: false, depth: 0 };
+try { window.history.replaceState({ am: 0 }, ''); HIST.ok = true; } catch (e) { HIST.ok = false; }
+function navSnap() { return { view: S.view, sel: S.sel, packLv: S.packLv, courseSel: S.courseSel }; }
+function navPush() {
+  if (!HIST.ok) return;
+  try { HIST.depth++; window.history.pushState({ am: HIST.depth }, ''); } catch (e) { }
+}
+function enter(v, keep) {
+  S.hist.push(navSnap());
+  if (S.hist.length > 40) S.hist.shift();
+  S.view = v;
+  if (!keep) { S.sel = null; S.courseSel = null; }
+  render(); toTop(); navPush();
+}
+function goto(v) { enter(v); }
+function back() {
+  if (HIST.ok && HIST.depth > 0) { window.history.back(); return; }
+  doBack();
+}
+function doBack() {
+  if (S.test) { clearInterval(S.test._timer); S.test = null; }
+  S.drill = null;
+  var st = S.hist.pop();
+  if (!st) { S.view = 'dash'; S.sel = null; S.courseSel = null; render(); toTop(); return; }
+  S.view = (st.view === 'test' || st.view === 'drill') ? 'dash' : st.view;
+  S.sel = st.sel; S.packLv = st.packLv; S.courseSel = st.courseSel;
+  render(); toTop();
+}
+window.addEventListener('popstate', function () {
+  if (HIST.depth > 0) HIST.depth--;
+  doBack();
+});
+var KEEP = /^(f-|b-|i-|s-|pg-|pack-per$|c-pace$|q$|qcat$|qlv$|qsort$)/;
+/* codeInput is excluded below */
+function snapInputs() {
+  var o = {};
+  Array.prototype.forEach.call(document.querySelectorAll('main input[id], main textarea[id], main select[id]'), function (el) {
+    if (el.id === 'codeInput' || !KEEP.test(el.id)) return;
+    o[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  return o;
+}
+function restoreInputs(o) {
+  Object.keys(o).forEach(function (k) {
+    var el = document.getElementById(k); if (!el) return;
+    if (el.type === 'checkbox') el.checked = o[k]; else el.value = o[k];
+  });
+}
+function softRender() {
+  if (S.view === 'test' || S.view === 'drill') return;
+  var ae = document.activeElement;
+  if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.closest('main')) { S.pending = true; return; }
+  var snap = snapInputs(); render(); restoreInputs(snap);
+}
+document.addEventListener('focusout', function () {
+  if (!S.pending) return;
+  setTimeout(function () {
+    var ae = document.activeElement;
+    if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+    S.pending = false; softRender();
+  }, 60);
+});
+
+/* ============ editor ============ */
+function bindEditor(onSubmit) {
+  var ta = $('#codeInput'), g = $('#gutter'), c = $('#counter');
+  if (!ta) return null;
+  var lines = -1;
+  function sync() {
+    var v = ta.value, n = v.split('\n').length;
+    if (n !== lines) {
+      lines = n;
+      var out = ''; for (var i = 1; i <= n; i++) out += i + (i < n ? '\n' : '');
+      g.textContent = out;
+    }
+    if (c) c.textContent = n + '줄 · ' + v.length + '자';
+  }
+  ta.addEventListener('input', sync);
+  ta.addEventListener('scroll', function () { g.scrollTop = ta.scrollTop; }, { passive: true });
+  ta.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSubmit(); return; }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      var a = ta.selectionStart, b = ta.selectionEnd, v = ta.value;
+      if (e.shiftKey) {
+        var ls = v.lastIndexOf('\n', a - 1) + 1;
+        if (v.slice(ls, ls + 4) === '    ') {
+          ta.value = v.slice(0, ls) + v.slice(ls + 4);
+          ta.selectionStart = ta.selectionEnd = Math.max(ls, a - 4);
+        }
+      } else {
+        ta.value = v.slice(0, a) + '    ' + v.slice(b);
+        ta.selectionStart = ta.selectionEnd = a + 4;
+      }
+      sync();
+    } else if (e.key === 'Enter') {
+      var a2 = ta.selectionStart, v2 = ta.value;
+      var ls2 = v2.lastIndexOf('\n', a2 - 1) + 1;
+      var cur = v2.slice(ls2, a2);
+      var ind = (cur.match(/^[ \t]*/) || [''])[0];
+      if (/[:{]\s*$/.test(cur)) ind += '    ';
+      if (ind) {
+        e.preventDefault();
+        ta.value = v2.slice(0, a2) + '\n' + ind + v2.slice(ta.selectionEnd);
+        ta.selectionStart = ta.selectionEnd = a2 + 1 + ind.length;
+        sync();
+      }
+    }
+  });
+  sync(); ta.focus();
+  return ta;
+}
+
+function wireEditor() {
+  if (!bindEditor(submitTest)) return;
+  var prob = S.problems.filter(function (x) { return x.id === S.test.pid; })[0];
+  var lim = prob ? timeLimit(prob) : 0;
+  clearInterval(S.test._timer);
+  S.test.start = S.test.start || Date.now();
+  S.test._timer = setInterval(function () {
+    var el = $('#timer'); if (!el) { clearInterval(S.test._timer); return; }
+    var sec = Math.floor((Date.now() - S.test.start) / 1000);
+    el.textContent = mmss(sec);
+    if (sec > lim) el.style.color = 'var(--bad)';
+  }, 1000);
+}
+
+
+function startTest(pid, idx, opt) {
+  opt = opt || {};
+  var p = S.problems.filter(function (x) { return x.id === pid; })[0];
+  if (!p) return;
+  S.test = {
+    pid: pid, idx: (idx == null ? null : idx), gate: !!opt.gate,
+    round: (idx != null && p.schedule && p.schedule[idx]) ? p.schedule[idx].round : '연습',
+    start: Date.now(), result: null, elapsed: 0, _timer: null
+  };
+  S.hist.push(navSnap()); S.view = 'test'; render(); toTop(); navPush();
+}
+function startDrill(pid, idx) {
+  var p = S.problems.filter(function (x) { return x.id === pid; })[0]; if (!p) return;
+  var t = traceTarget({ code: catalogCode(p) });
+  S.drill = {
+    pid: pid, idx: (idx == null ? null : idx), target: t,
+    need: clamp(p.trial || 1, 1, S.settings.trialMax || 10),
+    done: 0, pos: 0, errors: 0, written: 0, startedAt: Date.now()
+  };
+  S.hist.push(navSnap()); S.view = 'drill'; render(); toTop(); navPush();
+}
+
+function paintTrace() {
+  var dr = S.drill; if (!dr) return;
+  var v = document.getElementById('traceview'); if (!v) return;
+  var t = dr.target, pos = dr.pos;
+  var cur = t[pos];
+  var curHtml = cur === undefined ? '<span class="cur end"> </span>'
+    : (cur === '\n' ? '<span class="cur">↵</span>\n' : '<span class="cur">' + esc(cur) + '</span>');
+  v.innerHTML = '<span class="done">' + esc(t.slice(0, pos)) + '</span>' + curHtml +
+    '<span class="ghost">' + esc(t.slice(pos + 1)) + '</span>';
+  var el = v.querySelector('.cur');
+  if (el) { try { el.scrollIntoView({ block: 'nearest' }); } catch (e) { } }
+  var bar = document.getElementById('traceBar');
+  if (bar) bar.style.width = (t.length ? pos / t.length * 100 : 0) + '%';
+  var st = document.getElementById('traceStat');
+  if (st) st.textContent = Math.round(t.length ? pos / t.length * 100 : 0) + '% · 남은 글자 ' +
+    (t.length - pos) + ' · 오타 ' + dr.errors;
+  var warn = document.getElementById('traceWarn');
+  if (warn) {
+    if (dr.badKo) {
+      warn.className = 'hintbox warn-ko';
+      warn.innerHTML = '한글 입력 상태입니다. <b>한/영 키를 눌러 영문으로 바꿔 주세요.</b> 코드에는 한글이 없습니다.';
+    } else if (dr.errors > 4) {
+      var c = t[pos];
+      warn.className = 'hintbox';
+      warn.innerHTML = '지금 칠 글자: <span class="mono" style="font-weight:600">' +
+        (c === undefined ? '(끝)' : c === '\n' ? '엔터' : esc(c)) + '</span>';
+    } else {
+      warn.className = 'hintbox';
+      warn.style.display = 'none';
+      return;
+    }
+    warn.style.display = '';
+  }
+}
+
+function skipIndent() {
+  var dr = S.drill, t = dr.target;
+  while (dr.pos < t.length && (t[dr.pos] === ' ' || t[dr.pos] === '\t') &&
+    (dr.pos === 0 || t[dr.pos - 1] === '\n')) dr.pos++;
+}
+
+var HANGUL = /[\uac00-\ud7a3\u3131-\u318e]/;
+function traceInput() {
+  var dr = S.drill; if (!dr) return;
+  var ta = document.getElementById('tracein'); if (!ta) return;
+  if (dr._ime) return;
+  var t = dr.target, v = ta.value, pos = dr.pos;
+  var base = t.slice(0, pos);
+
+  if (v === base) {
+    /* 변화 없음 */
+  } else if (v.length > pos && v.slice(0, pos) === base) {
+    var i = pos;
+    while (i < v.length && i < t.length && v[i] === t[i]) i++;
+    dr.pos = i;
+    if (v.length > i) reject(v.slice(i));
+  } else if (v.length < pos && v === base.slice(0, v.length)) {
+    dr.pos = v.length;            /* 백스페이스만 뒤로 허용 */
+  } else {
+    reject(v.slice(pos));         /* IME 잔여물 등 — 제자리 유지 */
+  }
+  skipIndent();
+  ta.value = t.slice(0, dr.pos);
+  paintTrace();
+  if (dr.pos >= t.length) finishPass();
+}
+
+function reject(bad) {
+  var dr = S.drill;
+  dr.errors++;
+  dr.badKo = HANGUL.test(String(bad || ''));
+  flashErr();
+}
+
+var _errT = null;
+function flashErr() {
+  var box = document.getElementById('tracebox'); if (!box) return;
+  box.classList.add('err');
+  clearTimeout(_errT);
+  _errT = setTimeout(function () { box.classList.remove('err'); }, 170);
+}
+
+function finishPass() {
+  var dr = S.drill; if (!dr || dr._closing) return;
+  dr._closing = true;
+  var n = traceLines(dr.target);
+  dr.done++; dr.written += n;
+  /* 화면 전환이 먼저다. 기록은 실패해도 진행을 막지 않는다. */
+  if (dr.done >= dr.need) {
+    var pid = dr.pid, idx = dr.idx, need = dr.need;
+    S.drill = null;
+    startTest(pid, idx, {});
+    toast('깜지 ' + need + '회 완료 — 이제 실전입니다');
+  } else {
+    dr.pos = 0; dr._closing = false;
+    render();
+    toast(dr.done + '/' + dr.need + '회 완료');
+  }
+  try { bumpDaily(n, n); } catch (e) { }
+}
+
+function wireDrill() {
+  var ta = document.getElementById('tracein'); if (!ta) return;
+  var dr = S.drill;
+  ta.value = dr.target.slice(0, dr.pos);
+  ta.addEventListener('compositionstart', function () { dr._ime = true; });
+  ta.addEventListener('compositionend', function () {
+    dr._ime = false;
+    setTimeout(traceInput, 0);
+  });
+  ta.addEventListener('input', traceInput);
+  ta.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab') { e.preventDefault(); }
+  });
+  paintTrace();
+  ta.focus();
+  if (dr.pos >= dr.target.length) setTimeout(finishPass, 0);
+}
+
+function submitTest() {
+  var t = S.test; if (!t || t.result) return;
+  var ta = $('#codeInput'); if (!ta) return;
+  var p = S.problems.filter(function (x) { return x.id === t.pid; })[0]; if (!p) return;
+  if (!ta.value.trim()) { toast('작성한 코드가 없습니다'); return; }
+  t.answer = ta.value;
+  t.elapsed = Math.floor((Date.now() - t.start) / 1000);
+  clearInterval(t._timer);
+  t.result = grade(catalogCode(p), t.answer, p.lang || 'python');
+  try { bumpDaily(t.result.userLines, t.result.matched); } catch (e) { }
+  var lim = timeLimit(p);
+  var missing = t.result.checks.filter(function (c) { return !c.ok; }).length;
+  t.verdict = {
+    lim: lim, missing: missing,
+    perfect: t.result.rate >= 100 && missing === 0 && t.elapsed <= lim
+  };
+  render(); toTop();
+}
+function finishTest(retrain) {
+  var t = S.test; if (!t || !t.result) return;
+  var p = S.problems.filter(function (x) { return x.id === t.pid; })[0]; if (!p) return;
+  var T = today(), perfect = t.verdict.perfect, need = S.settings.streakNeed;
+
+  var streak = perfect ? (p.streak || 0) + 1 : 0;
+  var masteredAt = (perfect && streak >= need) ? T : null;
+  var trial = perfect ? 1 : Math.min(S.settings.trialMax || 10, (p.trial || 1) + 1);
+
+  var sc = (p.schedule || []).slice();
+  if (t.idx != null && sc[t.idx]) {
+    var item = sc[t.idx];
+    sc[t.idx] = Object.assign({}, item, { done: true, doneAt: T, rate: t.result.rate });
+    if (S.settings.retry && t.result.rate < S.settings.pass) {
+      sc.push({ round: item.round, due: addDays(T, 1), done: false, retry: true });
+      sc.sort(function (a, b) { return a.due < b.due ? -1 : (a.due > b.due ? 1 : a.round - b.round); });
+    }
+  }
+  var att = (p.attempts || []).concat([{
+    at: T, rate: t.result.rate, sec: t.elapsed, perfect: perfect,
+    tags: t.result.tags.slice(0, 6),
+    miss: t.result.checks.filter(function (c) { return !c.ok; }).map(function (c) { return c.k; }).slice(0, 6)
+  }]).slice(-40);
+
+  var wasGate = t.gate && perfect;
+  var np = Object.assign({}, p, {
+    schedule: sc, attempts: att, streak: streak, masteredAt: masteredAt, trial: trial
+  });
+  var idx = t.idx;
+  put('problems', S.problems, np).then(function () {
+    if (wasGate) { S.settings.gateDone = T; saveSettings(); }
+    S.test = null;
+    if (retrain) {
+      startDrill(np.id, idx);
+      toast('깜지 ' + trial + '회부터 다시 갑니다');
+      return;
+    }
+    back();
+    toast(perfect
+      ? (streak >= need ? '암기 완료 — ' + S.settings.decayDays + '일 뒤 재확인이 잡힙니다'
+        : '완벽 재현 ' + streak + '/' + need)
+      : '깜지 ' + trial + '회로 올랐습니다');
+  });
+}
+
+/* ============ actions ============ */
+function makeSchedule(base) {
+  return S.settings.intervals.map(function (d, i) {
+    return { round: i + 1, due: addDays(base, d), done: false };
+  });
+}
+
+document.addEventListener('click', function (e) {
+  var el = e.target.closest('[data-act]'); if (!el) return;
+  var a = el.dataset.act;
+
+  if (a === 'select') {
+    if (e.target.closest('[data-act]') !== el) return;
+    S.sel = (S.sel === el.dataset.p) ? null : el.dataset.p; render(); return;
+  }
+  if (a === 'back') { back(); return; }
+  if (a === 'course-open') {
+    S.hist.push(navSnap());
+    S.courseSel = el.dataset.c; S.view = 'pack';
+    render(); toTop(); navPush(); return;
+  }
+  if (a === 'course-start') { startCourse(el.dataset.c); return; }
+  if (a === 'pack-lv') { S.packOpen = true; S.packLv = parseInt(el.dataset.l, 10) || 0; render(); return; }
+  if (a === 'pack-course') {
+    var want = el.dataset.lv.split(',').map(Number), have0 = packRegistered();
+    CATALOG.forEach(function (c) { if (want.indexOf(c.lv) >= 0 && !have0[c.id]) S.packSel[c.id] = true; });
+    render(); return;
+  }
+  if (a === 'pack-tog') {
+    var cid = el.dataset.c; S.packSel[cid] = !S.packSel[cid];
+    S.packPerDay = clamp(parseInt(val('pack-per'), 10) || S.packPerDay, 1, 10);
+    render(); return;
+  }
+  if (a === 'pack-all') {
+    var have1 = packRegistered();
+    CATALOG.forEach(function (c) {
+      if (!have1[c.id] && (!S.packLv || c.lv === S.packLv)) S.packSel[c.id] = true;
+    });
+    render(); return;
+  }
+  if (a === 'pack-none') { S.packSel = {}; render(); return; }
+  if (a === 'pack-add') { registerPack(); return; }
+  if (a === 'go-pack') { goto('pack'); return; }
+  if (a === 'go-problem') { var pid = el.dataset.p; goto('bank'); S.sel = pid; render(); return; }
+  if (a === 'go-bank-new') { S.form = { id: null }; goto('bank'); return; }
+  if (a === 'form-open') { S.form = S.form ? null : { id: null }; render(); return; }
+  if (a === 'form-close') { S.form = null; render(); return; }
+  if (a === 'form-edit') { S.form = { id: el.dataset.p }; goto('bank'); return; }
+  if (a === 'form-save') { saveProblemForm(); return; }
+  if (a === 'del-p') {
+    if (!confirm('이 문제와 복습 기록을 모두 삭제할까요?')) return;
+    drop('problems', S.problems, el.dataset.p).then(function () { S.sel = null; render(); toast('삭제했습니다'); });
+    return;
+  }
+  if (a === 'drill-next') { finishPass(); return; }
+  if (a === 'trace-focus') { var ti = document.getElementById('tracein'); if (ti) ti.focus(); return; }
+  if (a === 'train') { startDrill(el.dataset.p, el.dataset.i == null ? null : parseInt(el.dataset.i, 10)); return; }
+  if (a === 'live') { startTest(el.dataset.p, el.dataset.i == null ? null : parseInt(el.dataset.i, 10), {}); return; }
+  if (a === 'giveup') {
+    var gp2 = S.problems.filter(function (x) { return x.id === S.test.pid; })[0]; if (!gp2) return;
+    var nt = Math.min(S.settings.trialMax || 10, (gp2.trial || 1) + 1);
+    var gidx = S.test.idx;
+    clearInterval(S.test._timer); S.test = null;
+    put('problems', S.problems, Object.assign({}, gp2, {
+      trial: nt, streak: 0, masteredAt: null, giveups: (gp2.giveups || 0) + 1
+    })).then(function () {
+      startDrill(gp2.id, gidx);
+      toast('깜지 ' + nt + '회부터 다시 갑니다');
+    });
+    return;
+  }
+  if (a === 'gate-start') {
+    var gp = gateProblem(); if (!gp) return;
+    startTest(gp.p.id, gp.i, { gate: true }); return;
+  }
+  if (a === 'gate-skip') {
+    S.settings.gateDone = today();
+    S.settings.gateSkip = (S.settings.gateSkip || 0) + 1;
+    saveSettings().then(function () { render(); toast('관문을 건너뛰었습니다 (누적 ' + S.settings.gateSkip + '회)'); });
+    return;
+  }
+  if (a === 'test-exit') {
+    if (S.test && !S.test.result && $('#codeInput') && $('#codeInput').value.trim() && !confirm('작성 중인 코드가 사라집니다. 나갈까요?')) return;
+    back(); return;
+  }
+  if (a === 'submit') { submitTest(); return; }
+  if (a === 'retry') { startTest(S.test.pid, S.test.idx, { gate: S.test.gate }); return; }
+  if (a === 'record') { finishTest(false); return; }
+  if (a === 'retrain') { finishTest(true); return; }
+  if (a === 'push') {
+    var p = S.problems.filter(function (x) { return x.id === el.dataset.p; })[0]; if (!p) return;
+    var i = parseInt(el.dataset.i, 10), sc = (p.schedule || []).slice();
+    sc[i] = Object.assign({}, sc[i], { due: today() });
+    put('problems', S.problems, Object.assign({}, p, { schedule: sc })).then(function () { render(); toast('오늘로 옮겼습니다'); });
+    return;
+  }
+  if (a === 'book-new') { S.bookForm = !S.bookForm; render(); return; }
+  if (a === 'book-cancel') { S.bookForm = false; render(); return; }
+  if (a === 'book-save') {
+    var bt = val('b-title'); if (!bt) { toast('책 제목을 입력하세요'); return; }
+    var b = { id: uid(), title: bt, total: num('b-total', 0), current: num('b-cur', 0), status: 'reading', createdAt: today(), log: [] };
+    put('books', S.books, b).then(function () { S.bookForm = false; render(); toast('책을 추가했습니다'); });
+    return;
+  }
+  if (a === 'book-page') {
+    var bk = S.books.filter(function (x) { return x.id === el.dataset.b; })[0]; if (!bk) return;
+    var np2 = num('pg-' + bk.id, bk.current || 0);
+    var delta = np2 - (bk.current || 0);
+    var log = (bk.log || []).slice(), T2 = today(), found = false;
+    if (delta > 0) {
+      for (var k = 0; k < log.length; k++) if (log[k].d === T2) { log[k] = { d: T2, p: log[k].p + delta }; found = true; break; }
+      if (!found) log.push({ d: T2, p: delta });
+      if (log.length > 120) log = log.slice(-120);
+    }
+    var nb = Object.assign({}, bk, { current: np2, log: log, status: (bk.total && np2 >= bk.total) ? 'done' : 'reading' });
+    put('books', S.books, nb).then(function () { render(); toast(delta > 0 ? delta + '페이지 기록' : '진도를 수정했습니다'); });
+    return;
+  }
+  if (a === 'book-del') {
+    if (!confirm('이 책을 삭제할까요? 인사이트 기록은 남습니다.')) return;
+    drop('books', S.books, el.dataset.b).then(function () { render(); });
+    return;
+  }
+  if (a === 'ins-new') { S.insForm = !S.insForm; render(); return; }
+  if (a === 'ins-cancel') { S.insForm = false; render(); return; }
+  if (a === 'ins-save') {
+    var tx = val('i-text'); if (!tx) { toast('내용을 입력하세요'); return; }
+    var ins = { id: uid(), bookId: val('i-book'), page: num('i-page', 0), text: tx, date: today() };
+    put('insights', S.insights, ins).then(function () { S.insForm = false; render(); toast('인사이트를 기록했습니다'); });
+    return;
+  }
+  if (a === 'ins-del') { drop('insights', S.insights, el.dataset.i).then(function () { render(); }); return; }
+  if (a === 's-save') {
+    var iv = val('s-int').split(',').map(function (x) { return parseInt(x.trim(), 10); })
+      .filter(function (x) { return !isNaN(x) && x > 0 && x < 400; });
+    if (!iv.length) { toast('복습 간격을 하나 이상 입력하세요'); return; }
+    iv.sort(function (a2, b2) { return a2 - b2; });
+    S.settings = Object.assign({}, S.settings, {
+      intervals: iv, pass: clamp(num('s-pass', 80), 10, 100),
+      retry: val('s-retry') === '1', newGoal: clamp(num('s-new', 1), 0, 20),
+      readGoal: clamp(num('s-read', 20), 0, 500),
+      streakNeed: clamp(num('s-streak', 3), 1, 10),
+      secPerLine: clamp(num('s-spl', 10), 2, 60),
+      baseSec: clamp(num('s-base', 30), 0, 300),
+      decayDays: clamp(num('s-decay', 30), 7, 180),
+      gate: val('s-gate') === '1',
+      trialMax: clamp(num('s-tmax', 10), 2, 20)
+    });
+    saveSettings().then(function () { render(); toast('설정을 저장했습니다'); });
+    return;
+  }
+  if (a === 'sync-code') {
+    if (!confirm('내장 문제의 코드를 최신 버전으로 되돌립니다. 직접 수정한 코드는 사라집니다. 계속할까요?')) return;
+    var byId2 = {};
+    CATALOG.forEach(function (c) { byId2[c.id] = c; });
+    var n2 = 0;
+    S.problems.slice().forEach(function (p) {
+      var c = p.srcId && byId2[p.srcId];
+      if (!c || p.code === c.code) return;
+      put('problems', S.problems, Object.assign({}, p, {
+        code: c.code, logic: c.logic, brief: c.brief, limits: c.limits, category: c.cat
+      }));
+      n2++;
+    });
+    render();
+    toast(n2 ? n2 + '개를 최신 코드로 바꿨습니다' : '이미 전부 최신입니다');
+    return;
+  }
+  if (a === 'copy-json') {
+    var data = JSON.stringify({ problems: S.problems, books: S.books, insights: S.insights, settings: S.settings }, null, 2);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(data).then(function () { toast('JSON을 클립보드에 복사했습니다'); },
+        function () { toast('복사에 실패했습니다'); });
+    } else toast('이 브라우저에서는 복사를 지원하지 않습니다');
+    return;
+  }
+  if (a === 'import') { importLocal(); return; }
+  if (a === 'dismiss-import') { S.canImport = false; render(); return; }
+});
+
+function saveProblemForm() {
+  var title = val('f-title'), code = document.getElementById('f-code').value;
+  if (!title) { toast('문제 제목을 입력하세요'); return; }
+  if (!code.trim()) { toast('정답 코드를 입력하세요'); return; }
+  var base = val('f-base') || today();
+  var old = S.form.id ? S.problems.filter(function (x) { return x.id === S.form.id; })[0] : null;
+  var regen = document.getElementById('f-regen');
+  var p = {
+    id: old ? old.id : uid(),
+    srcId: old ? old.srcId : undefined,
+    brief: old ? old.brief : undefined,
+    category: val('f-cat') || '미분류',
+    title: title, url: val('f-url'), limits: val('f-limit'),
+    logic: document.getElementById('f-logic').value.trim(),
+    code: code, lang: val('f-lang') || 'python',
+    createdAt: base,
+    schedule: (old && !(regen && regen.checked)) ? (old.schedule || makeSchedule(base)) : makeSchedule(base),
+    attempts: (old && !(regen && regen.checked)) ? (old.attempts || []) : []
+  };
+  put('problems', S.problems, p).then(function () {
+    S.form = null; S.sel = p.id; render();
+    toast(old ? '수정했습니다' : '등록 완료 — ' + S.settings.intervals.join('·') + '일 뒤 복습이 예약되었습니다');
+  });
+}
+
+document.addEventListener('input', function (e) {
+  var t = e.target;
+  if (t.dataset && t.dataset.live === 'q') { S.filter.q = t.value; refreshBankList(); }
+});
+document.addEventListener('change', function (e) {
+  var t = e.target;
+  if (t.dataset && t.dataset.live === 'cat') { S.filter.cat = t.value; render(); }
+  if (t.dataset && t.dataset.live === 'lv') { S.filter.lv = t.value; render(); }
+  if (t.dataset && t.dataset.live === 'pace') { S.coursePace = clamp(parseInt(t.value, 10) || 2, 1, 5); }
+  if (t.dataset && t.dataset.live === 'sort') { S.settings.bankSort = t.value; saveSettings(); render(); }
+});
+var _bt = null;
+function refreshBankList() { clearTimeout(_bt); _bt = setTimeout(function () { if (S.view === 'bank') { var q = val('q'); render(); var i = document.getElementById('q'); if (i) { i.focus(); i.setSelectionRange(q.length, q.length); } } }, 220); }
+
+$('#nav').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-v]'); if (!b) return;
+  if (gateProblem()) { toast('오늘의 관문을 먼저 통과하세요'); return; }
+  if (S.view === 'test' && S.test && !S.test.result && $('#codeInput') && $('#codeInput').value.trim()) {
+    if (!confirm('작성 중인 코드가 사라집니다. 이동할까요?')) return;
+  }
+  if (S.drill && S.drill.pos > 0 && !confirm('쓰던 깜지가 사라집니다. 이동할까요?')) return;
+  if (S.test) { clearInterval(S.test._timer); S.test = null; }
+  S.drill = null;
+  goto(b.dataset.v);
+});
+
+$('#themeBtn').addEventListener('click', function () {
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : (cur === 'light' ? '' : 'dark');
+  if (next) document.documentElement.setAttribute('data-theme', next);
+  else document.documentElement.removeAttribute('data-theme');
+  try { localStorage.setItem('algo-memory:theme', next); } catch (e) { }
+});
+try {
+  var th = localStorage.getItem('algo-memory:theme');
+  if (th) document.documentElement.setAttribute('data-theme', th);
+} catch (e) { }
+
+/* ============ boot ============ */
+loadLocal();
+try { _localBackup = JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) { _localBackup = null; }
+syncCatalogCode();
+render();
+
+resolveDb().then(function (db) {
+  if (!db) return;
+  DB = db; S.mode = 'cloud';
+  S.problems = []; S.books = []; S.insights = [];
+  subscribe();
+});
+
+})();
+</script>
+</body>
+</html>
