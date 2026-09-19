@@ -809,7 +809,7 @@ function viewPack() {
       '<div class="bar" style="margin-top:9px"><i style="width:' + pct + '%"></i></div>' +
       '<div class="small mono muted" style="margin-top:5px">등록 ' + st.reg + '/' + st.n +
       ' · 암기 완료 ' + st.done + '/' + st.n + '</div>' +
-      '</div></div></div>';
+      '</div><span class="chev">›</span></div></div>';
   }).join('') + '</div>';
 
   /* 낱개로 고르기 */
@@ -896,8 +896,11 @@ function viewCourseDetail() {
     '<dt>분량</dt><dd>' + st.n + '개 · 하루 ' + pace + '개 기준 ' + days + '일</dd>' +
     '<dt>수료 기준</dt><dd>' + st.n + '개 전부 암기 완료 (각각 연속 ' + S.settings.streakNeed + '회 완벽 재현)</dd>' +
     '</dl>' +
-    '<div class="bar" style="margin-top:16px"><i style="width:' + (st.n ? st.done / st.n * 100 : 0) + '%"></i></div>' +
-    '<div class="small mono muted" style="margin-top:6px">등록 ' + st.reg + '/' + st.n + ' · 암기 완료 ' + st.done + '/' + st.n + '</div>' +
+    '<div class="bar2" style="margin-top:16px">' +
+    '<i class="reg" style="width:' + (st.n ? st.reg / st.n * 100 : 0) + '%"></i>' +
+    '<i class="done" style="width:' + (st.n ? st.done / st.n * 100 : 0) + '%"></i></div>' +
+    '<div class="small mono muted" style="margin-top:6px">등록 ' + st.reg + '/' + st.n +
+    ' · 암기 완료 ' + st.done + '/' + st.n + '</div>' +
     (st.reg < st.n
       ? '<div class="row" style="margin-top:16px">' +
         '<label class="small muted" style="display:flex;align-items:center;gap:6px">하루' +
@@ -905,8 +908,10 @@ function viewCourseDetail() {
         '<button class="btn accent" data-act="course-start" data-c="' + c.id + '">' +
         (st.reg ? '남은 ' + (st.n - st.reg) + '개 이어서 등록' : '코스 시작') + '</button>' +
         '<span class="small muted">오늘부터 ' + Math.ceil((st.n - st.reg) / pace) + '일에 걸쳐 배치됩니다</span></div>'
-      : '<div class="row" style="margin-top:16px"><span class="chip accent">전부 등록됨</span>' +
-        '<span class="small muted">일정은 문제별로 잡혀 있습니다. 대시보드에서 오늘 차례를 확인하세요.</span></div>') +
+      : '<div class="row" style="margin-top:16px">' +
+        '<button class="btn accent" data-act="go-dash">오늘 차례 보기</button>' +
+        '<span class="chip accent">전부 등록됨</span>' +
+        '<span class="small muted">일정은 문제별로 잡혀 있습니다</span></div>') +
     '</div>';
 
   /* 일차별 계획 */
@@ -922,16 +927,22 @@ function viewCourseDetail() {
       group.map(function (it) {
         var pr = st.map[it.id];
         var stt = itemState(pr);
-        return '<div class="pk"><div class="row" style="align-items:flex-start;flex-wrap:nowrap">' +
+        var todayish = pr && (pr.createdAt === today() || (pr.schedule || []).some(function (x) {
+          return !x.done && dayDiff(x.due, today()) >= 0;
+        }));
+        return '<div class="pk' + (todayish ? ' now' : '') + '"><div class="row" style="align-items:flex-start;flex-wrap:nowrap">' +
           '<div class="grow" style="min-width:0">' +
-          '<div style="font-weight:500;font-size:14px">' + esc(it.title) + '</div>' +
+          '<div class="row" style="gap:7px">' +
+          '<strong style="font-size:14.5px">' + esc(it.title) + '</strong>' +
+          (todayish ? '<span class="chip warn">오늘</span>' : '') + '</div>' +
           '<div class="small muted" style="margin-top:2px">' + esc(it.brief) + '</div>' +
-          '<div class="row small" style="margin-top:6px">' +
+          '<div class="row small" style="margin-top:7px">' +
           '<span class="chip mono">' + it.code.split('\n').filter(function (l) { return l.trim(); }).length + '줄</span>' +
-          '<span class="chip">' + esc(it.cat) + '</span>' + stateChip(stt) +
-          (pr ? '<span class="chip mono">깜지 ' + (pr.trial || 1) + '회</span>' +
-            '<button class="btn sm ghost" data-act="train" data-p="' + pr.id + '">훈련</button>' +
-            '<button class="btn sm ghost" data-act="live" data-p="' + pr.id + '">실전</button>' : '') +
+          stateChip(stt) +
+          (pr && (pr.trial || 1) > 1 ? '<span class="chip bad">깜지 ' + pr.trial + '회</span>' : '') +
+          (pr ? '<span class="grow"></span>' +
+            '<button class="btn sm accent" data-act="train" data-p="' + pr.id + '">훈련</button>' +
+            '<button class="btn sm" data-act="live" data-p="' + pr.id + '">실전</button>' : '') +
           '</div>' +
           (pr ? '' : '<details class="fold" style="margin-top:6px"><summary>미리보기 — 코드와 주의점</summary>' +
             '<div class="hintbox" style="margin:8px 0">' + esc(it.logic) + '</div>' +
@@ -1072,7 +1083,8 @@ function viewBank() {
         (nd ? '<span>다음 ' + relDate(nd) + '</span>' : '<span class="chip accent">주기 완료</span>') +
         '</div></div>' +
         masteryChip(mastery(p)) +
-        '<span class="rate ' + rateClass(r) + '">' + (r == null ? '—' : r + '%') + '</span></div>' +
+        '<span class="rate ' + rateClass(r) + '">' + (r == null ? '—' : r + '%') + '</span>' +
+        '<span class="chev">' + (S.sel === p.id ? '⌄' : '›') + '</span></div>' +
         (S.sel === p.id ? problemDetail(p) : '');
     }).join('') + '</div>';
   }
@@ -2094,6 +2106,7 @@ document.addEventListener('click', function (e) {
   if (a === 'pack-none') { S.packSel = {}; render(); return; }
   if (a === 'pack-add') { registerPack(); return; }
   if (a === 'go-pack') { goto('pack'); return; }
+  if (a === 'go-dash') { goto('dash'); return; }
   if (a === 'go-problem') { var pid = el.dataset.p; goto('bank'); S.sel = pid; render(); return; }
   if (a === 'go-bank-new') { S.form = { id: null }; goto('bank'); return; }
   if (a === 'form-open') { S.form = S.form ? null : { id: null }; render(); return; }
