@@ -318,8 +318,28 @@ if __name__ == "__main__":
     if failed or missing:
         raise SystemExit(1)
 
+    from notes import NOTES
+    bad = []
     for item in C:
         item["lv"] = NEW[item["id"]]
+        n = NOTES.get(item["id"])
+        if not n:
+            bad.append((item["id"], "해설 없음"))
+            continue
+        item["story"] = n["story"]
+        item["where"] = n["where"]
+        item["keys"] = n["keys"]
+        lines = [l for l in item["code"].split("\n") if l.strip()]
+        if n["walk"]:
+            if len(n["walk"]) != len(lines):
+                bad.append((item["id"], "walk %d줄 vs 코드 %d줄" % (len(n["walk"]), len(lines))))
+            else:
+                item["walk"] = n["walk"]
+    if bad:
+        print("\n해설 불일치:")
+        for i, m in bad:
+            print("  %-16s %s" % (i, m))
+        raise SystemExit(1)
 
     by_lv = {}
     for item in C:

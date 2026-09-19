@@ -1,7 +1,7 @@
 /** 빌드 산출물(dist/algo-memory.html)에 대한 종단 테스트.
  *  node test/smoke.test.js 로 실행하며 실패 시 종료 코드 1. */
 const assert = require('assert');
-const { open } = require('./harness');
+const { open, today } = require('./harness');
 const { makeFakeDb } = require('./fake-db');
 
 const CODE = 'name = "gony"\nage = 35\nscore = 92.5\n\nprint(name)\nprint(age, score)\nprint("name:", name)';
@@ -14,8 +14,8 @@ function problem(over) {
   return Object.assign({
     id: 'p1', srcId: 's0-var', category: '기초 문법', title: '변수와 출력',
     brief: '', logic: '대입과 출력', limits: '', code: CODE, lang: 'python',
-    createdAt: '2026-09-18', trial: 1, streak: 0, masteredAt: null,
-    schedule: [{ round: 1, due: '2026-09-18', done: false }], attempts: []
+    createdAt: today(), trial: 1, streak: 0, masteredAt: null,
+    schedule: [{ round: 1, due: today(), done: false }], attempts: []
   }, over || {});
 }
 
@@ -101,7 +101,7 @@ test('깜지를 다 채우면 실전으로 넘어간다', async () => {
   assert.strictEqual(t.view(), 'v-test');
   assert.ok(!t.d.getElementById('hintFold'), '실전에는 힌트가 없다');
   assert.ok(t.d.querySelector('[data-act="giveup"]'), '모르겠다 버튼');
-  assert.strictEqual(t.local().daily['2026-09-18'].w, 6, '쓴 줄이 기록된다');
+  assert.strictEqual(t.local().daily[today()].w, 6, '쓴 줄이 기록된다');
 });
 
 test('실전에 실패하면 깜지 횟수가 올라간다', async () => {
@@ -132,7 +132,7 @@ test('연속 3회 완벽하면 암기 완료가 된다', async () => {
   t.click('[data-act="record"]'); await t.tick(80);
   const p = t.local().problems[0];
   assert.strictEqual(p.streak, 3);
-  assert.strictEqual(p.masteredAt, '2026-09-18');
+  assert.strictEqual(p.masteredAt, today());
   assert.strictEqual(p.trial, 1, '통과하면 깜지 횟수가 1로 돌아간다');
 });
 
@@ -181,6 +181,56 @@ test('문제 은행 기본 정렬이 난이도 순이다', async () => {
   t.click('#nav button[data-v="bank"]'); await t.tick();
   const titles = t.texts('.prow .ttl').slice(0, 3);
   assert.deepStrictEqual(titles, ['변수와 출력', '사칙연산과 나머지', '함수 만들기']);
+});
+
+test('해설 탭에 스토리와 줄별 해설이 나온다', async () => {
+  const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  assert.deepStrictEqual(t.texts('.detail .lvtab'), ['해설', '복습 일정', '기록']);
+  const body = t.d.querySelector('#v-bank .detail').textContent;
+  assert.ok(body.includes('어디에 쓰나'), '쓰임새 항목');
+  assert.ok(body.includes('기억할 것'), '핵심 포인트');
+  const rows = t.d.querySelectorAll('.walk .wrow');
+  assert.strictEqual(rows.length, 6, '코드 줄 수만큼 해설 행이 있어야 한다');
+  assert.ok(rows[0].textContent.includes('상자'), '첫 줄 해설이 붙어 있어야 한다');
+  t.click('.detail .lvtab[data-t="sched"]'); await t.tick();
+  assert.ok(t.d.querySelector('#v-bank .detail').textContent.includes('회차'));
+});
+
+test('깜지 중 현재 줄 해설이 따라온다', async () => {
+  const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="train"]'); await t.tick();
+  const note = () => t.d.getElementById('traceNote').textContent;
+  const ta = t.d.getElementById('tracein');
+  ta.value = CODE.slice(0, 3); ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  assert.ok(note().includes('1번째 줄'), '첫 줄 해설');
+  const upto = CODE.indexOf('print(name)') + 3;
+  ta.value = CODE.slice(0, upto); ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  assert.ok(note().includes('4번째 줄'), '커서가 옮겨가면 해설도 따라와야 한다: ' + note().slice(0, 30));
+  t.click('[data-act="drill-note"]'); await t.tick();
+  assert.ok(!t.d.getElementById('traceNote'), '해설 숨기기');
+});
+
+test('세 문장 설명을 쓰면 모범 해설과 대조하고 저장된다', async () => {
+  const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('[data-act="explain-open"]'); await t.tick();
+  t.set('ex-0', '모든 코드의 시작');
+  t.set('ex-1', '이름표 붙은 상자에 값을 넣는다');
+  t.set('ex-2', '따옴표 유무');
+  t.click('[data-act="explain-show"]'); await t.tick();
+  assert.ok(t.d.querySelector('#v-bank .detail').textContent.includes('모범 해설'));
+  t.click('[data-act="explain-save"][data-ok="1"]'); await t.tick(80);
+  const ex = t.local().problems[0].explain;
+  assert.strictEqual(ex.ok, true);
+  assert.strictEqual(ex.a[1], '이름표 붙은 상자에 값을 넣는다');
 });
 
 (async () => {
