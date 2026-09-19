@@ -249,6 +249,7 @@ pre.code{
 .dl.same .tx{color:var(--ink-2)}
 .dl.miss{background:var(--bad-soft)} .dl.miss .mk{color:var(--bad)}
 .dl.extra{background:var(--warn-soft)} .dl.extra .mk{color:var(--warn)}
+.dl.soft{opacity:.55}
 .dl mark{background:color-mix(in srgb, var(--bad) 28%, transparent);color:inherit;border-radius:3px;padding:0 1px}
 .dl.extra mark{background:color-mix(in srgb, var(--warn) 34%, transparent)}
 .ind{display:inline-block;color:var(--line-2)}

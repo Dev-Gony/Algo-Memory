@@ -113,7 +113,7 @@ test('실전에 실패하면 깜지 횟수가 올라간다', async () => {
   const ta = t.d.getElementById('codeInput');
   ta.value = 'wrong = 1'; ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
   t.click('[data-act="submit"]'); await t.tick();
-  assert.ok(t.d.querySelector('.verdict-card h2').textContent.includes('아닙니다'));
+  assert.ok(t.d.querySelector('.verdict-card h2').textContent.includes('아직'));
   t.click('[data-act="retrain"]'); await t.tick(80);
   assert.strictEqual(t.view(), 'v-drill');
   assert.strictEqual(t.local().problems[0].trial, 2);
@@ -231,6 +231,86 @@ test('세 문장 설명을 쓰면 모범 해설과 대조하고 저장된다', a
   const ex = t.local().problems[0].explain;
   assert.strictEqual(ex.ok, true);
   assert.strictEqual(ex.a[1], '이름표 붙은 상자에 값을 넣는다');
+});
+
+test('오타 하나는 봐주고 줄 누락은 봐주지 않는다', async () => {
+  const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="live"]'); await t.tick();
+  const ta = t.d.getElementById('codeInput');
+  // 변수명 오타 하나
+  ta.value = CODE.replace('score = 92.5', 'scoer = 92.5');
+  ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  t.click('[data-act="submit"]'); await t.tick();
+  assert.ok(t.d.querySelector('.verdict-card h2').textContent.includes('통과'),
+    '오타 1개는 통과여야 한다: ' + t.d.querySelector('.verdict-card h2').textContent);
+  assert.ok(t.d.querySelector('.verdict-card').classList.contains('ok'));
+
+  // 줄 하나를 통째로 빠뜨리면 실패
+  const t2 = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
+  await t2.tick();
+  t2.click('#nav button[data-v="bank"]'); await t2.tick();
+  t2.click('.prow'); await t2.tick();
+  t2.click('.detail [data-act="live"]'); await t2.tick();
+  const ta2 = t2.d.getElementById('codeInput');
+  ta2.value = CODE.split('\n').filter((l) => !l.startsWith('score')).join('\n');
+  ta2.dispatchEvent(new t2.w.Event('input', { bubbles: true }));
+  t2.click('[data-act="submit"]'); await t2.tick();
+  assert.ok(t2.d.querySelector('.verdict-card h2').textContent.includes('아직'), '줄 누락은 실패');
+});
+
+test('두 번째 실패부터는 틀린 부분만 훈련한다', async () => {
+  const LONG = 'def solve(n):\n    dp = [0] * (n + 1)\n    dp[1] = 1\n    for i in range(2, n + 1):\n        dp[i] = dp[i - 1] + dp[i - 2]\n    return dp[n]';
+  const p = problem({ code: LONG, srcId: null, title: '피보나치 DP', trial: 2,
+    weak: { lines: ['dp[i] = dp[i - 1] + dp[i - 2]'], at: today() } });
+  const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="train"]'); await t.tick();
+  assert.ok(t.d.querySelector('.testhead').textContent.includes('깜지'), '1회차는 전체');
+  const full = t.d.getElementById('traceview').textContent;
+  assert.ok(full.includes('def solve'), '전체 코드가 나와야 한다');
+  await t.trace(LONG);
+  assert.strictEqual(t.view(), 'v-drill', '전체 뒤에 블록 단계가 와야 한다');
+  const head = t.d.querySelector('.testhead').textContent;
+  assert.ok(head.includes('틀린 부분만'), '블록 단계 표시: ' + head);
+  const blockText = t.d.getElementById('traceview').textContent;
+  assert.ok(blockText.includes('dp[i] = dp[i - 1]'), '틀린 줄이 들어 있어야 한다');
+  assert.ok(!blockText.includes('def solve'), '전체가 아니라 일부여야 한다');
+  assert.ok(blockText.split('\n').length <= 4, '앞뒤 한 줄씩만: ' + blockText.split('\n').length);
+});
+
+test('같은 문제에서 세 번 막히면 오늘은 여기까지', async () => {
+  const past = [1, 2].map(() => ({ at: today(), rate: 20, sec: 10, perfect: false, tags: [], miss: [] }));
+  const t = open({ storage: { problems: [problem({ trial: 3, attempts: past })], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="live"]'); await t.tick();
+  const ta = t.d.getElementById('codeInput');
+  ta.value = 'x = 1'; ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  t.click('[data-act="submit"]'); await t.tick();
+  t.click('[data-act="retrain"]'); await t.tick(80);
+  assert.strictEqual(t.view(), 'v-dash', '깜지로 안 보내고 대시보드로');
+  assert.ok(t.d.querySelector('#v-dash').textContent.includes('오늘은 여기까지'));
+  const p = t.local().problems[0];
+  assert.strictEqual(p.trial, 3, '깜지 횟수를 올리지 않는다');
+  assert.ok(p.restUntil, '내일로 미룬다');
+});
+
+test('취약한 문제가 오늘 목록 앞에 온다', async () => {
+  const weakP = problem({ id: 'w', title: '취약한 문제', trial: 4, giveups: 2,
+    attempts: [{ at: today(), rate: 30, sec: 10, perfect: false, tags: [], miss: ['dp 배열', 'for 반복문'] }] });
+  const easyP = problem({ id: 'e', title: '쉬운 문제', trial: 1,
+    attempts: [{ at: today(), rate: 100, sec: 10, perfect: true, tags: [], miss: [] }] });
+  const t = open({ storage: { problems: [easyP, weakP], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  const titles = t.texts('#v-dash .qrow .ttl');
+  assert.strictEqual(titles[0], '취약한 문제', '순서: ' + titles.join(' / '));
+  assert.ok(t.texts('#v-dash .qrow')[0].includes('취약'), '취약 표시');
 });
 
 (async () => {
