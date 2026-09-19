@@ -259,6 +259,7 @@ pre.code{
 .dl.same .tx{color:var(--ink-2)}
 .dl.miss{background:var(--bad-soft)} .dl.miss .mk{color:var(--bad)}
 .dl.extra{background:var(--warn-soft)} .dl.extra .mk{color:var(--warn)}
+.dl.soft{opacity:.55}
 .dl mark{background:color-mix(in srgb, var(--bad) 28%, transparent);color:inherit;border-radius:3px;padding:0 1px}
 .dl.extra mark{background:color-mix(in srgb, var(--warn) 34%, transparent)}
 .ind{display:inline-block;color:var(--line-2)}
@@ -524,14 +525,14 @@ function ordOf(p) { return (p && p.srcId != null && ORD[p.srcId] != null) ? ORD[
 var DEFAULTS = {
   intervals: [1, 3, 7, 14, 30], pass: 80, retry: true, readGoal: 20, newGoal: 1,
   streakNeed: 3, secPerLine: 10, baseSec: 30, decayDays: 30, gate: false, gateDone: '', gateSkip: 0,
-  trialMax: 10, bankSort: 'lv', drillNote: true
+  trialMax: 10, bankSort: 'lv', drillNote: true, grace: 1, restAfter: 3
 };
 var S = {
   problems: [], books: [], insights: [], settings: Object.assign({}, DEFAULTS),
   view: 'dash', form: null, bookForm: false, insForm: false, sel: null,
   filter: { q: '', cat: '', lv: '' }, test: null, pending: false, mode: 'local', canImport: false,
   packSel: {}, packPerDay: 2, packLv: 1,
-  drill: null, daily: {}, courseSel: null, hist: [],
+  drill: null, daily: {}, courseSel: null, hist: [], restCard: null,
   detailTab: 'note', explainOpen: null, explainShown: null
 };
 
@@ -724,6 +725,12 @@ function lcsDiff(a, b) {
   while (j < m) ops.push({ t: 'extra', b: b[j++] });
   return { ops: ops, lcs: n && m ? dp[0][0] : 0, n: n, m: m };
 }
+function pairSim(x, y) {
+  var L = Math.min(x.length, y.length), p = 0, s = 0;
+  while (p < L && x[p] === y[p]) p++;
+  while (s < L - p && x[x.length - 1 - s] === y[y.length - 1 - s]) s++;
+  return (p + s) / Math.max(x.length, y.length, 1);
+}
 function markPair(x, y) {
   var L = Math.min(x.length, y.length), p = 0, s = 0;
   while (p < L && x[p] === y[p]) p++;
@@ -788,7 +795,9 @@ function grade(original, answer, lang) {
 
   /* pair up miss/extra runs so near-misses read as one edited line */
   var rows = [], tags = {}, i = 0;
+  var surface = 0, hard = 0, weak = [];
   function tag(t) { tags[t] = (tags[t] || 0) + 1; }
+  function markHard(line) { hard++; if (weak.indexOf(line) < 0 && weak.length < 8) weak.push(line); }
   while (i < d.ops.length) {
     var op = d.ops[i];
     if (op.t === 'same') { rows.push({ k: 'same', d: op.a.depth, t: op.a.text }); i++; continue; }
@@ -798,12 +807,20 @@ function grade(original, answer, lang) {
     var pairs = Math.min(miss.length, extra.length), k;
     for (k = 0; k < pairs; k++) {
       var h = markPair(miss[k].text, extra[k].text);
-      rows.push({ k: 'miss', d: miss[k].depth, html: h[0] });
-      rows.push({ k: 'extra', d: extra[k].depth, html: h[1] });
+      var soft = (miss[k].text === extra[k].text) || pairSim(miss[k].text, extra[k].text) >= 0.75;
+      rows.push({ k: 'miss', d: miss[k].depth, html: h[0], soft: soft });
+      rows.push({ k: 'extra', d: extra[k].depth, html: h[1], soft: soft });
       if (miss[k].text === extra[k].text) tag('들여쓰기'); else tag(tagOf(miss[k].text));
+      if (soft) surface++; else markHard(miss[k].text);
     }
-    for (k = pairs; k < miss.length; k++) { rows.push({ k: 'miss', d: miss[k].depth, t: miss[k].text }); tag(tagOf(miss[k].text)); }
-    for (k = pairs; k < extra.length; k++) { rows.push({ k: 'extra', d: extra[k].depth, t: extra[k].text }); tag('불필요한 라인'); }
+    for (k = pairs; k < miss.length; k++) {
+      rows.push({ k: 'miss', d: miss[k].depth, t: miss[k].text });
+      tag(tagOf(miss[k].text)); markHard(miss[k].text);
+    }
+    for (k = pairs; k < extra.length; k++) {
+      rows.push({ k: 'extra', d: extra[k].depth, t: extra[k].text });
+      tag('불필요한 라인'); hard++;
+    }
   }
 
   /* structural check */
@@ -815,7 +832,7 @@ function grade(original, answer, lang) {
   checks.sort(function (x, y) { return (x.ok === y.ok) ? y.need - x.need : (x.ok ? 1 : -1); });
 
   return {
-    rate: rate, rows: rows, checks: checks,
+    rate: rate, rows: rows, checks: checks, surface: surface, hard: hard, weak: weak,
     tags: Object.keys(tags).map(function (k) { return { k: k, n: tags[k] }; }).sort(function (a, b) { return b.n - a.n; }),
     origLines: A.length, userLines: B.length, matched: d.lcs
   };
@@ -848,10 +865,12 @@ function dueList() {
   var T = today(), out = [];
   S.problems.forEach(function (p) {
     (p.schedule || []).forEach(function (s, i) {
+      if (resting(p)) return;
       if (!s.done && dayDiff(s.due, T) >= 0) out.push({ p: p, s: s, i: i, late: dayDiff(s.due, T) });
     });
   });
-  out.sort(function (a, b) { return b.late - a.late || ordOf(a.p) - ordOf(b.p); });
+  out.forEach(function (d) { d.risk = riskOf(d.p, d.late); });
+  out.sort(function (a, b) { return b.risk - a.risk || ordOf(a.p) - ordOf(b.p); });
   return out;
 }
 function doneOn(date) {
@@ -941,7 +960,42 @@ function traceTarget(p) {
   while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
   return lines.join('\n');
 }
+/* 마지막 실패에서 틀린 줄들을 앞뒤 한 줄씩 붙여 잘라낸다.
+   한 줄만 떼면 맥락이 사라져서 무슨 코드인지 알 수 없다. */
+function blockTarget(p) {
+  var w = p.weak && p.weak.lines;
+  if (!w || !w.length) return null;
+  var raw = catalogCode(p).replace(/\r\n?/g, '\n').split('\n');
+  var norm = raw.map(function (l) { return l.trim().replace(/\s+/g, ' '); });
+  var hits = [];
+  w.forEach(function (t) {
+    var k = String(t).trim().replace(/\s+/g, ' ');
+    norm.forEach(function (n, i) { if (n && n === k) hits.push(i); });
+  });
+  if (!hits.length) return null;
+  var lo = Math.max(0, Math.min.apply(null, hits) - 1);
+  var hi = Math.min(raw.length - 1, Math.max.apply(null, hits) + 1);
+  var out = raw.slice(lo, hi + 1).map(function (l) { return l.replace(/[ \t]+$/, ''); });
+  while (out.length && !out[0].trim()) out.shift();
+  while (out.length && !out[out.length - 1].trim()) out.pop();
+  if (!out.length) return null;
+  var txt = out.join('\n');
+  /* 전체와 사실상 같으면 블록 훈련의 의미가 없다 */
+  if (traceLines(txt) >= traceLines(traceTarget({ code: catalogCode(p) })) - 1) return null;
+  return { text: txt, from: lo + 1, to: hi + 1 };
+}
 function traceLines(t) { return t.split('\n').filter(function (l) { return l.trim(); }).length; }
+function todayFails(p) {
+  var T = today();
+  return (p.attempts || []).filter(function (a) { return a.at === T && !a.perfect; }).length;
+}
+function resting(p) { return p.restUntil && dayDiff(today(), p.restUntil) > 0; }
+function riskOf(p, late) {
+  var a = (p.attempts || []).slice(-5);
+  var rate = a.length ? a.reduce(function (x, y) { return x + y.rate; }, 0) / a.length : 100;
+  var missAvg = a.length ? a.reduce(function (x, y) { return x + ((y.miss || []).length); }, 0) / a.length : 0;
+  return (late || 0) * 3 + (100 - rate) / 10 + missAvg * 2 + ((p.trial || 1) - 1) * 2 + (p.giveups || 0);
+}
 function mastery(p) {
   var need = S.settings.streakNeed, st = p.streak || 0;
   if (p.masteredAt) {
@@ -1046,6 +1100,25 @@ function viewDash() {
       }).join('') + '</div>';
   }
 
+  if (S.restCard) {
+    h += '<div class="card pad" style="margin-bottom:20px;border-color:var(--warn)">' +
+      '<div class="chip warn" style="margin-bottom:10px">오늘은 여기까지</div>' +
+      '<h2 style="font-size:17px;margin-bottom:6px">' + esc(S.restCard.title) + '</h2>' +
+      '<p class="small" style="color:var(--ink-2);margin-bottom:12px">' +
+      '오늘 이 문제에서 ' + S.restCard.fails + '번 막혔습니다. 여기서 더 반복해도 잘 안 들어갑니다. ' +
+      '깜지 횟수는 올리지 않았고 내일 다시 꺼내드립니다. 다른 문제를 하시거나 오늘은 접으셔도 됩니다.</p>' +
+      '<div class="row"><button class="btn" data-act="rest-ok">알겠습니다</button>' +
+      '<button class="btn ghost" data-act="rest-force" data-p="' + esc(S.restCard.id) + '">그래도 한 번 더</button></div></div>';
+  }
+
+  var rested = S.problems.filter(resting);
+  if (rested.length && !S.restCard) {
+    h += '<div class="card pad" style="margin-bottom:16px"><div class="row">' +
+      '<span class="chip warn">쉬는 중 ' + rested.length + '건</span>' +
+      '<span class="small muted grow">' + esc(rested.map(function (x) { return x.title; }).slice(0, 3).join(', ')) +
+      ' — 오늘 여러 번 막혀서 내일로 미뤘습니다</span></div></div>';
+  }
+
   if (!S.problems.length) {
     h += '<div class="card pad" style="margin-bottom:20px;border-color:var(--accent)">' +
       '<h2 style="font-size:16px;margin-bottom:6px">검증된 대표 유형 ' + CATALOG.length + '개가 들어 있습니다</h2>' +
@@ -1095,6 +1168,7 @@ function viewDash() {
         '<span class="mono">' + (d.s.round) + '/' + total + '회차</span>' +
         '<span class="rounds">' + dots + '</span>' +
         (d.late > 0 ? '<span class="chip bad">' + d.late + '일 지연</span>' : '<span class="chip accent">오늘</span>') +
+        (d.risk >= 6 ? '<span class="chip warn">취약</span>' : '') +
         (d.s.retry ? '<span class="chip warn">재복습</span>' : '') +
         '</div></div>' +
         masteryChip(mastery(d.p)) +
@@ -1630,7 +1704,9 @@ function viewTest() {
     '<div class="row" style="align-items:center;gap:14px">' +
     '<div class="stamp ' + (v.perfect ? 'ok' : 'no') + '">' + (v.perfect ? '암기<br>확인' : '아직') + '</div>' +
     '<div class="grow"><h2 style="font-size:17px">' +
-    (v.perfect ? '완벽 재현했습니다' : '완벽 재현이 아닙니다') + '</h2>' +
+    (v.perfect
+      ? (v.clean ? '완벽 재현했습니다' : '통과 — 오타 ' + v.surface + '개는 봐줬습니다')
+      : '아직 재현이 안 됩니다') + '</h2>' +
     '<div class="small muted" style="margin-top:2px">' +
     (v.perfect
       ? (nextStreak >= S.settings.streakNeed
@@ -1639,8 +1715,9 @@ function viewTest() {
       : '네 조건 중 하나라도 어긋나면 연속 기록은 0으로 돌아갑니다. 현재 연속 ' + (p.streak || 0) + '회.') +
     '</div></div></div>' +
     '<div class="checklist" style="margin-top:14px">' +
-    [['일치율 100%', r.rate >= 100, r.rate + '%'],
-     ['핵심 구조 누락 없음', v.missing === 0, v.missing + '개 누락'],
+    [['핵심 구조 누락 없음', v.missing === 0, v.missing + '개 누락'],
+     ['빠지거나 더한 줄 없음', v.hard === 0, v.hard + '줄'],
+     ['오타·들여쓰기', v.surface <= v.grace, v.surface + ' / 허용 ' + v.grace],
      ['제한 시간 내', t.elapsed <= v.lim, mmss(t.elapsed) + ' / ' + mmss(v.lim)]
     ].map(function (row) {
       return '<div class="ck ' + (row[1] ? 'ok' : 'no') + '"><span class="s">' + (row[1] ? '✓' : '✕') + '</span>' +
@@ -1683,9 +1760,9 @@ function viewTest() {
       var mk = row.k === 'same' ? ' ' : (row.k === 'miss' ? '−' : '+');
       var ind = row.d ? '<span class="ind">' + '·   '.repeat(row.d) + '</span>' : '';
       var body = row.html != null ? row.html : esc(row.t);
-      return '<div class="dl ' + row.k + '"><span class="mk">' + mk + '</span><span class="tx">' + ind + body + '</span></div>';
+      return '<div class="dl ' + row.k + (row.soft ? ' soft' : '') + '"><span class="mk">' + mk + '</span><span class="tx">' + ind + body + '</span></div>';
     }).join('') + '</div>' +
-    '<div class="small muted" style="margin-top:8px">− 원본에 있는데 쓰지 못한 줄 · + 원본에 없는 줄</div>';
+    '<div class="small muted" style="margin-top:8px">− 원본에 있는데 쓰지 못한 줄 · + 원본에 없는 줄 · 흐린 것은 오타로 보고 봐준 줄</div>';
   return h;
 }
 
@@ -1697,10 +1774,15 @@ function viewDrill() {
   return '<div class="testhead">' +
     '<button class="btn ghost sm" data-act="back">← 나가기</button>' +
     '<div class="grow"><h2>' + esc(p.title) + '</h2>' +
-    '<div class="small muted"><span class="chip">깜지</span> ' +
-    '<span class="chip mono">' + traceLines(dr.target) + '줄</span> ' +
-    '베껴 쓰기 · 통과하면 바로 실전으로 넘어갑니다</div></div>' +
-    '<div class="timer mono">' + (dr.done + 1) + '<span style="font-size:14px;color:var(--ink-3)">/' + dr.need + '</span></div>' +
+    '<div class="small muted">' +
+    (dr.phase === 'block'
+      ? '<span class="chip bad">틀린 부분만</span> <span class="chip mono">' + dr.blk.from + '~' + dr.blk.to + '번째 줄</span> '
+      : '<span class="chip">깜지</span> <span class="chip mono">' + traceLines(dr.target) + '줄</span> ') +
+    (dr.phase === 'block' ? '전체는 한 번 썼으니 이제 막혔던 곳만 굳힙니다' : '베껴 쓰기 · 통과하면 실전으로 넘어갑니다') +
+    '</div></div>' +
+    '<div class="timer mono">' +
+    ((dr.phase === 'full' ? dr.doneFull : dr.doneBlock) + 1) +
+    '<span style="font-size:14px;color:var(--ink-3)">/' + (dr.phase === 'full' ? dr.needFull : dr.needBlock) + '</span></div>' +
     '</div>' +
     '<div class="bar" style="margin-bottom:6px"><i id="traceBar" style="width:0%"></i></div>' +
     '<div class="editbar" style="margin:0 0 12px">' +
@@ -1714,12 +1796,13 @@ function viewDrill() {
     '<textarea class="tracein" id="tracein" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off"></textarea>' +
     '</div>' +
     (dr.pos >= dr.target.length
-      ? '<div class="row" style="margin-top:14px"><button class="btn accent" data-act="drill-next">' +
-        (dr.done + 1 >= dr.need ? '실전으로 넘어가기' : '다음 회차로') + '</button>' +
+      ? '<div class="row" style="margin-top:14px"><button class="btn accent" data-act="drill-next">다음으로</button>' +
         '<span class="small muted">다 채웠습니다</span></div>'
       : '') +
     '<p class="small muted" style="margin-top:12px">회색 글자 위로 그대로 따라 치세요. 틀린 글자는 들어가지 않습니다. ' +
-    (dr.need > 1 ? '이번 문제는 실전에서 ' + (dr.need - 1) + '번 막혀서 ' + dr.need + '회입니다.' : '') + '</p>';
+    (dr.needBlock > 0
+      ? '전체 1회를 쓴 뒤, 지난번에 틀린 부분만 ' + dr.needBlock + '회 더 씁니다. 같은 줄을 통째로 다시 치는 것보다 낫습니다.'
+      : (dr.needFull > 1 ? '이번 문제는 실전에서 ' + (dr.needFull - 1) + '번 막혀서 ' + dr.needFull + '회입니다.' : '')) + '</p>';
 }
 
 function viewBooks() {
@@ -1920,10 +2003,11 @@ function viewSettings() {
 
   h += '<div class="card pad"><div class="sect-h"><h2>암기 판정</h2>' +
     '<span class="sub">"정말 다 외웠는가"의 기준</span></div>' +
-    '<p class="small" style="color:var(--ink-2);margin-bottom:14px">일치율 100% + 구조 누락 0 + 힌트 미사용 + 제한 시간 내, ' +
-    '이 넷을 모두 만족한 회차만 완벽 재현으로 칩니다. 하나라도 어긋나면 연속 기록은 0이 됩니다.</p>' +
-    '<div class="f3"><label class="f"><span>연속 몇 회면 암기 완료</span><input type="number" id="s-streak" min="1" max="10" value="' + st.streakNeed + '"></label>' +
-    '<label class="f"><span>제한 시간 — 줄당 초</span><input type="number" id="s-spl" min="2" max="60" value="' + st.secPerLine + '"></label>' +
+    '<p class="small" style="color:var(--ink-2);margin-bottom:14px">구조 누락 0 + 빠지거나 더한 줄 0 + 제한 시간 내를 만족하면 통과입니다. ' +
+    '오타나 들여쓰기처럼 논리와 무관한 실수는 아래 허용치까지 봐줍니다. 0으로 두면 한 글자도 안 봐줍니다.</p>' +
+    '<div class="f2" style="margin-bottom:0"><label class="f"><span>오타·들여쓰기 허용 개수</span><input type="number" id="s-grace" min="0" max="5" value="' + st.grace + '"></label>' +
+    '<label class="f"><span>연속 몇 회면 암기 완료</span><input type="number" id="s-streak" min="1" max="10" value="' + st.streakNeed + '"></label></div>' +
+    '<div class="f2"><label class="f"><span>제한 시간 — 줄당 초</span><input type="number" id="s-spl" min="2" max="60" value="' + st.secPerLine + '"></label>' +
     '<label class="f"><span>제한 시간 — 기본 여유 초</span><input type="number" id="s-base" min="0" max="300" value="' + st.baseSec + '"></label></div>' +
     '<div class="f2"><label class="f"><span>암기 완료 후 재확인 (일)</span><input type="number" id="s-decay" min="7" max="180" value="' + st.decayDays + '"></label>' +
     '<label class="f"><span>관문 모드</span><select id="s-gate">' +
@@ -1933,8 +2017,10 @@ function viewSettings() {
   h += '<div class="card pad"><div class="sect-h"><h2>깜지</h2>' +
     '<span class="sub">실패할수록 늘어납니다</span></div>' +
     '<p class="small" style="color:var(--ink-2);margin-bottom:14px">깜지는 전체 코드를 보면서 그대로 베껴 쓰는 단계입니다. ' +
-    '처음에는 1회, 실전에서 막히거나 모르겠다를 누를 때마다 1회씩 늘어납니다. 실전을 통과하면 다시 1회로 돌아갑니다.</p>' +
-    '<label class="f"><span>깜지 최대 횟수</span><input type="number" id="s-tmax" min="2" max="20" value="' + st.trialMax + '"></label></div>';
+    '처음에는 전체 1회. 실전에서 막히면 전체 1회 + 틀렸던 부분만 추가로 반복합니다. 실전을 통과하면 다시 1회로 돌아갑니다.</p>' +
+    '<div class="f2"><label class="f"><span>깜지 최대 횟수</span><input type="number" id="s-tmax" min="2" max="20" value="' + st.trialMax + '"></label>' +
+    '<label class="f"><span>오늘은 여기까지 — 한 문제 실패 횟수</span><input type="number" id="s-rest" min="2" max="10" value="' + st.restAfter + '"></label></div>' +
+    '<p class="small muted">2회차부터는 전체를 다시 쓰지 않고, 지난번에 틀린 줄과 그 앞뒤만 떼어 훈련합니다.</p></div>';
 
   h += '<div class="card pad"><div class="sect-h"><h2>일일 목표</h2></div>' +
     '<div class="f2"><label class="f"><span>신규 문제 (개)</span><input type="number" id="s-new" min="0" max="20" value="' + st.newGoal + '"></label>' +
@@ -2116,20 +2202,41 @@ function startTest(pid, idx, opt) {
 }
 function startDrill(pid, idx) {
   var p = S.problems.filter(function (x) { return x.id === pid; })[0]; if (!p) return;
-  var t = traceTarget({ code: catalogCode(p) });
+  var full = traceTarget({ code: catalogCode(p) });
+  var blk = blockTarget(p);
+  var trial = clamp(p.trial || 1, 1, S.settings.trialMax || 10);
+  var needFull, needBlock;
+  if (trial <= 1 || !blk) { needFull = trial; needBlock = 0; }
+  else { needFull = 1; needBlock = trial - 1; }
+
   var wr = walkRows(p);
-  var wmap = null;
-  if (wr) {
-    var wi = -1;
-    wmap = t.split('\n').map(function (l) { if (l.trim()) { wi++; return wi; } return -1; });
-  }
   S.drill = {
-    pid: pid, idx: (idx == null ? null : idx), target: t,
-    walk: wr, wmap: wmap, showNote: S.settings.drillNote !== false,
-    need: clamp(p.trial || 1, 1, S.settings.trialMax || 10),
+    pid: pid, idx: (idx == null ? null : idx),
+    full: full, blk: blk, needFull: needFull, needBlock: needBlock,
+    doneFull: 0, doneBlock: 0, phase: 'full', target: full,
+    walkAll: wr, walk: wr, wmap: null,
+    showNote: S.settings.drillNote !== false,
     done: 0, pos: 0, errors: 0, written: 0, startedAt: Date.now()
   };
+  buildWalkMap();
   S.hist.push(navSnap()); S.view = 'drill'; render(); toTop(); navPush();
+}
+
+/* 현재 target 의 각 줄이 전체 코드의 몇 번째 줄인지 대응시킨다 */
+function buildWalkMap() {
+  var dr = S.drill;
+  if (!dr || !dr.walkAll) { if (dr) { dr.wmap = null; dr.walk = null; } return; }
+  var fullLines = dr.full.split('\n').filter(function (l) { return l.trim(); })
+    .map(function (l) { return l.trim().replace(/\s+/g, ' '); });
+  var wi = -1;
+  dr.walk = dr.walkAll;
+  dr.wmap = dr.target.split('\n').map(function (l) {
+    if (!l.trim()) return -1;
+    var k = l.trim().replace(/\s+/g, ' ');
+    var at = fullLines.indexOf(k);
+    wi++;
+    return at >= 0 ? at : wi;
+  });
 }
 
 function paintTrace() {
@@ -2231,17 +2338,32 @@ function finishPass() {
   var dr = S.drill; if (!dr || dr._closing) return;
   dr._closing = true;
   var n = traceLines(dr.target);
-  dr.done++; dr.written += n;
-  /* 화면 전환이 먼저다. 기록은 실패해도 진행을 막지 않는다. */
-  if (dr.done >= dr.need) {
-    var pid = dr.pid, idx = dr.idx, need = dr.need;
+  dr.written += n;
+  if (dr.phase === 'full') dr.doneFull++; else dr.doneBlock++;
+
+  var goTest = false, nextPhase = dr.phase;
+  if (dr.phase === 'full' && dr.doneFull >= dr.needFull) {
+    if (dr.needBlock > 0 && dr.blk) nextPhase = 'block'; else goTest = true;
+  } else if (dr.phase === 'block' && dr.doneBlock >= dr.needBlock) {
+    goTest = true;
+  }
+
+  if (goTest) {
+    var pid = dr.pid, idx = dr.idx;
     S.drill = null;
     startTest(pid, idx, {});
-    toast('깜지 ' + need + '회 완료 — 이제 실전입니다');
+    toast('깜지 완료 — 이제 실전입니다');
   } else {
+    if (nextPhase !== dr.phase) {
+      dr.phase = 'block';
+      dr.target = dr.blk.text;
+      buildWalkMap();
+      toast('전체 1회 완료 — 이제 틀렸던 부분만 ' + dr.needBlock + '회');
+    } else {
+      toast((dr.phase === 'full' ? dr.doneFull : dr.doneBlock) + '회 완료');
+    }
     dr.pos = 0; dr._closing = false;
     render();
-    toast(dr.done + '/' + dr.need + '회 완료');
   }
   try { bumpDaily(n, n); } catch (e) { }
 }
@@ -2276,9 +2398,12 @@ function submitTest() {
   try { bumpDaily(t.result.userLines, t.result.matched); } catch (e) { }
   var lim = timeLimit(p);
   var missing = t.result.checks.filter(function (c) { return !c.ok; }).length;
+  var grace = S.settings.grace;
   t.verdict = {
-    lim: lim, missing: missing,
-    perfect: t.result.rate >= 100 && missing === 0 && t.elapsed <= lim
+    lim: lim, missing: missing, grace: grace,
+    surface: t.result.surface, hard: t.result.hard,
+    clean: t.result.surface === 0 && t.result.hard === 0 && missing === 0,
+    perfect: t.result.hard === 0 && missing === 0 && t.result.surface <= grace && t.elapsed <= lim
   };
   render(); toTop();
 }
@@ -2289,7 +2414,10 @@ function finishTest(retrain) {
 
   var streak = perfect ? (p.streak || 0) + 1 : 0;
   var masteredAt = (perfect && streak >= need) ? T : null;
-  var trial = perfect ? 1 : Math.min(S.settings.trialMax || 10, (p.trial || 1) + 1);
+  var fails = todayFails(p) + (perfect ? 0 : 1);
+  var rest = !perfect && fails >= (S.settings.restAfter || 3);
+  var trial = perfect ? 1
+    : (rest ? (p.trial || 1) : Math.min(S.settings.trialMax || 10, (p.trial || 1) + 1));
 
   var sc = (p.schedule || []).slice();
   if (t.idx != null && sc[t.idx]) {
@@ -2300,6 +2428,15 @@ function finishTest(retrain) {
       sc.sort(function (a, b) { return a.due < b.due ? -1 : (a.due > b.due ? 1 : a.round - b.round); });
     }
   }
+  /* 취약한 문제는 다음 회차를 앞당긴다 */
+  if (!perfect) {
+    for (var q = 0; q < sc.length; q++) {
+      if (sc[q].done) continue;
+      var gap = dayDiff(T, sc[q].due);
+      if (gap > 1) sc[q] = Object.assign({}, sc[q], { due: addDays(T, Math.max(1, Math.floor(gap / 2))) });
+      break;
+    }
+  }
   var att = (p.attempts || []).concat([{
     at: T, rate: t.result.rate, sec: t.elapsed, perfect: perfect,
     tags: t.result.tags.slice(0, 6),
@@ -2308,15 +2445,23 @@ function finishTest(retrain) {
 
   var wasGate = t.gate && perfect;
   var np = Object.assign({}, p, {
-    schedule: sc, attempts: att, streak: streak, masteredAt: masteredAt, trial: trial
+    schedule: sc, attempts: att, streak: streak, masteredAt: masteredAt, trial: trial,
+    weak: perfect ? null : { lines: t.result.weak, at: T },
+    restUntil: rest ? addDays(T, 1) : (perfect ? null : p.restUntil)
   });
   var idx = t.idx;
   put('problems', S.problems, np).then(function () {
     if (wasGate) { S.settings.gateDone = T; saveSettings(); }
     S.test = null;
+    if (rest) {
+      S.restCard = { id: np.id, title: np.title, fails: fails };
+      goto('dash');
+      toast('오늘은 이 문제를 여기서 멈춥니다');
+      return;
+    }
     if (retrain) {
       startDrill(np.id, idx);
-      toast('깜지 ' + trial + '회부터 다시 갑니다');
+      toast(t.result.weak.length ? '틀린 부분만 집중해서 다시 갑니다' : '깜지 ' + trial + '회부터 다시 갑니다');
       return;
     }
     back();
@@ -2405,6 +2550,13 @@ document.addEventListener('click', function (e) {
     drop('problems', S.problems, el.dataset.p).then(function () { S.sel = null; render(); toast('삭제했습니다'); });
     return;
   }
+  if (a === 'rest-ok') { S.restCard = null; render(); return; }
+  if (a === 'rest-force') {
+    var rp = S.problems.filter(function (x) { return x.id === el.dataset.p; })[0];
+    S.restCard = null;
+    if (rp) put('problems', S.problems, Object.assign({}, rp, { restUntil: null })).then(function () { startDrill(rp.id, null); });
+    return;
+  }
   if (a === 'drill-next') { finishPass(); return; }
   if (a === 'drill-note') {
     S.drill.showNote = !S.drill.showNote;
@@ -2416,12 +2568,22 @@ document.addEventListener('click', function (e) {
   if (a === 'live') { startTest(el.dataset.p, el.dataset.i == null ? null : parseInt(el.dataset.i, 10), {}); return; }
   if (a === 'giveup') {
     var gp2 = S.problems.filter(function (x) { return x.id === S.test.pid; })[0]; if (!gp2) return;
-    var nt = Math.min(S.settings.trialMax || 10, (gp2.trial || 1) + 1);
+    var gf = todayFails(gp2) + 1;
+    var grest = gf >= (S.settings.restAfter || 3);
+    var nt = grest ? (gp2.trial || 1) : Math.min(S.settings.trialMax || 10, (gp2.trial || 1) + 1);
     var gidx = S.test.idx;
     clearInterval(S.test._timer); S.test = null;
     put('problems', S.problems, Object.assign({}, gp2, {
-      trial: nt, streak: 0, masteredAt: null, giveups: (gp2.giveups || 0) + 1
+      trial: nt, streak: 0, masteredAt: null, giveups: (gp2.giveups || 0) + 1,
+      restUntil: grest ? addDays(today(), 1) : gp2.restUntil,
+      attempts: (gp2.attempts || []).concat([{ at: today(), rate: 0, sec: 0, perfect: false, gaveUp: true, tags: [], miss: [] }]).slice(-40)
     })).then(function () {
+      if (grest) {
+        S.restCard = { id: gp2.id, title: gp2.title, fails: gf };
+        goto('dash');
+        toast('오늘은 이 문제를 여기서 멈춥니다');
+        return;
+      }
       startDrill(gp2.id, gidx);
       toast('깜지 ' + nt + '회부터 다시 갑니다');
     });
@@ -2502,7 +2664,9 @@ document.addEventListener('click', function (e) {
       baseSec: clamp(num('s-base', 30), 0, 300),
       decayDays: clamp(num('s-decay', 30), 7, 180),
       gate: val('s-gate') === '1',
-      trialMax: clamp(num('s-tmax', 10), 2, 20)
+      trialMax: clamp(num('s-tmax', 10), 2, 20),
+      grace: clamp(num('s-grace', 1), 0, 5),
+      restAfter: clamp(num('s-rest', 3), 2, 10)
     });
     saveSettings().then(function () { render(); toast('설정을 저장했습니다'); });
     return;
