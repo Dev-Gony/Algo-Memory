@@ -360,13 +360,6 @@ body.gated nav button:not([data-v="dash"]){opacity:.35;pointer-events:none}
   border-radius:8px;padding-left:10px;margin-left:-10px;
 }
 
-/* ---------- books ---------- */
-.bookgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
-.book{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px;box-shadow:var(--shadow)}
-.ins{border-left:2px solid var(--accent);padding:2px 0 2px 13px;margin-bottom:14px}
-.ins .q{font-size:14px;line-height:1.65;white-space:pre-wrap}
-.ins .m{font-size:11.5px;color:var(--ink-3);margin-top:5px;font-family:var(--mono)}
-
 /* ---------- stats ---------- */
 .chart{display:flex;align-items:flex-end;gap:5px;height:130px;padding-top:10px}
 .chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
@@ -439,7 +432,6 @@ details.fold[open] > summary::before{content:"▾ "}
     <button data-v="dash" aria-current="true">대시보드<span class="badge" id="navDue" hidden>0</span></button>
     <button data-v="pack">코스</button>
     <button data-v="bank">문제 은행</button>
-    <button data-v="books">독서 · 인사이트</button>
     <button data-v="stats">통계</button>
     <button data-v="settings">설정</button>
   </nav>
@@ -451,7 +443,6 @@ details.fold[open] > summary::before{content:"▾ "}
   <section class="view" id="v-bank"></section>
   <section class="view" id="v-test"></section>
   <section class="view" id="v-drill"></section>
-  <section class="view" id="v-books"></section>
   <section class="view" id="v-stats"></section>
   <section class="view" id="v-settings"></section>
 </main>
@@ -539,13 +530,13 @@ CATALOG.forEach(function (c, i) { ORD[c.id] = i; });
 function ordOf(p) { return (p && p.srcId != null && ORD[p.srcId] != null) ? ORD[p.srcId] : 99999; }
 
 var DEFAULTS = {
-  intervals: [1, 3, 7, 14, 30], pass: 80, retry: true, readGoal: 20, newGoal: 1,
+  intervals: [1, 3, 7, 14, 30], pass: 80, retry: true, newGoal: 1,
   streakNeed: 3, secPerLine: 10, baseSec: 30, decayDays: 30, gate: false, gateDone: '', gateSkip: 0,
   trialMax: 10, bankSort: 'lv', drillNote: true, grace: 1, restAfter: 3
 };
 var S = {
   problems: [], books: [], insights: [], settings: Object.assign({}, DEFAULTS),
-  view: 'dash', form: null, bookForm: false, insForm: false, sel: null,
+  view: 'dash', form: null, sel: null,
   filter: { q: '', cat: '', lv: '' }, test: null, pending: false, mode: 'local', canImport: false,
   packSel: {}, packPerDay: 2, packLv: 1,
   drill: null, daily: {}, courseSel: null, hist: [], restCard: null,
@@ -658,7 +649,8 @@ function subscribe() {
       checkImport(); softRender();
     }, function () { });
   };
-  sub('problems', 'problems'); sub('books', 'books'); sub('insights', 'insights');
+  sub('problems', 'problems');
+  /* 독서·인사이트는 화면에서 걷어냈다. 이미 저장된 문서는 지우지 않고 그대로 둔다. */
   DB.doc('config/settings').onSnapshot(function (s) {
     if (s.exists) S.settings = Object.assign({}, DEFAULTS, s.data());
     softRender();
@@ -904,11 +896,6 @@ function overdueCount() {
   S.problems.forEach(function (p) { (p.schedule || []).forEach(function (s) { if (!s.done && dayDiff(s.due, T) > 0) n++; }); });
   return n;
 }
-function pagesOn(date) {
-  var n = 0;
-  S.books.forEach(function (b) { (b.log || []).forEach(function (e) { if (e.d === date) n += e.p; }); });
-  return n;
-}
 function avgRate(p) {
   var a = (p.attempts || []); if (!a.length) return null;
   var s = 0; a.forEach(function (x) { s += x.rate; });
@@ -1078,7 +1065,7 @@ function viewDash() {
   }
   var doneT = doneOn(T), totalT = doneT + due.length;
   var newT = S.problems.filter(function (p) { return p.createdAt === T; }).length;
-  var pagesT = pagesOn(T), over = due.filter(function (d) { return d.late > 0; }).length;
+  var over = due.filter(function (d) { return d.late > 0; }).length;
 
   var h = '';
   if (S.canImport) {
@@ -1095,8 +1082,6 @@ function viewDash() {
       totalT ? doneT / totalT * 100 : 100, over ? 'bad' : '') +
     tile('신규 등록', newT + '<em>/' + S.settings.newGoal + '</em>', '문제', '오늘 새로 암기할 문제',
       S.settings.newGoal ? newT / S.settings.newGoal * 100 : 100) +
-    tile('독서', pagesT + '<em>/' + S.settings.readGoal + '</em>', 'p', '오늘 읽은 분량',
-      S.settings.readGoal ? pagesT / S.settings.readGoal * 100 : 100, 'warn') +
     (S.problems.length ? tile('암기 완료', masteredCount() + '<em>/' + S.problems.length + '</em>', '개',
       '연속 ' + S.settings.streakNeed + '회 완벽 재현',
       masteredCount() / S.problems.length * 100) : '') +
@@ -1833,73 +1818,6 @@ function viewDrill() {
       : (dr.needFull > 1 ? '이번 문제는 실전에서 ' + (dr.needFull - 1) + '번 막혀서 ' + dr.needFull + '회입니다.' : '')) + '</p>';
 }
 
-function viewBooks() {
-  var T = today();
-  var h = '<div class="sect-h"><h2>독서 진도</h2><span class="sub">' + S.books.length + '권</span><span class="grow"></span>' +
-    '<button class="btn sm" data-act="book-new">+ 책 추가</button></div>';
-
-  if (S.bookForm) {
-    h += '<div class="card pad" style="margin-bottom:14px"><div class="f3">' +
-      '<label class="f"><span>책 제목</span><input type="text" id="b-title" placeholder="자기관리론 — 데일 카네기"></label>' +
-      '<label class="f"><span>총 페이지</span><input type="number" id="b-total" min="1" placeholder="380"></label>' +
-      '<label class="f"><span>현재 페이지</span><input type="number" id="b-cur" min="0" value="0"></label></div>' +
-      '<div class="row"><button class="btn accent" data-act="book-save">추가</button>' +
-      '<button class="btn ghost" data-act="book-cancel">취소</button></div></div>';
-  }
-
-  if (!S.books.length) {
-    h += '<div class="card empty"><span class="em">▭</span>읽고 있는 책을 등록하면 진도율과 인사이트를 함께 관리합니다.</div>';
-  } else {
-    h += '<div class="bookgrid">' + S.books.map(function (b) {
-      var pct = b.total ? clamp(Math.round(b.current / b.total * 100), 0, 100) : 0;
-      var doneFlag = b.status === 'done' || (b.total && b.current >= b.total);
-      return '<div class="book"><div class="row" style="align-items:flex-start">' +
-        '<div class="grow"><strong>' + esc(b.title) + '</strong>' +
-        '<div class="small muted mono">' + (b.current || 0) + ' / ' + (b.total || '?') + ' p</div></div>' +
-        (doneFlag ? '<span class="chip accent">완독</span>' : '<span class="chip">진행 중</span>') + '</div>' +
-        '<div class="bar warn" style="margin-top:10px"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="row" style="margin-top:10px">' +
-        '<span class="mono small muted">' + pct + '%</span><span class="grow"></span>' +
-        '<input type="number" min="0" id="pg-' + b.id + '" value="' + (b.current || 0) + '" style="width:84px;padding:5px 8px">' +
-        '<button class="btn sm" data-act="book-page" data-b="' + b.id + '">기록</button>' +
-        '<button class="btn sm ghost danger" data-act="book-del" data-b="' + b.id + '">삭제</button></div>' +
-        '</div>';
-    }).join('') + '</div>';
-  }
-
-  h += '<div class="sect-h" style="margin-top:24px"><h2>인사이트 기록</h2><span class="sub">' + S.insights.length + '개</span>' +
-    '<span class="grow"></span><button class="btn sm accent" data-act="ins-new">+ 기록</button></div>';
-
-  if (S.insForm) {
-    h += '<div class="card pad" style="margin-bottom:14px">' +
-      '<div class="f2"><label class="f"><span>책</span><select id="i-book">' +
-      S.books.map(function (b) { return '<option value="' + b.id + '">' + esc(b.title) + '</option>'; }).join('') +
-      '<option value="">(책 없이 기록)</option></select></label>' +
-      '<label class="f"><span>페이지</span><input type="number" id="i-page" min="0" placeholder="선택"></label></div>' +
-      '<label class="f"><span>핵심 문장 / 느낀 점</span><textarea id="i-text" placeholder="오늘 붙잡을 한 문장과, 그것을 내 상황에 어떻게 적용할지"></textarea></label>' +
-      '<div class="row"><button class="btn accent" data-act="ins-save">저장</button>' +
-      '<button class="btn ghost" data-act="ins-cancel">취소</button></div></div>';
-  }
-
-  var ins = S.insights.slice().sort(function (a, b) { return (b.date + b.id).localeCompare(a.date + a.id); });
-  if (!ins.length) {
-    h += '<div class="card empty"><span class="em">❞</span>아직 기록된 인사이트가 없습니다.</div>';
-  } else {
-    var byDate = {};
-    ins.forEach(function (i) { (byDate[i.date] = byDate[i.date] || []).push(i); });
-    h += '<div class="card pad">' + Object.keys(byDate).sort().reverse().map(function (d) {
-      return '<div style="margin-bottom:18px"><div class="small mono muted" style="margin-bottom:8px">' + esc(d) + (d === T ? ' · 오늘' : '') + '</div>' +
-        byDate[d].map(function (i) {
-          var bk = S.books.filter(function (b) { return b.id === i.bookId; })[0];
-          return '<div class="ins"><div class="q">' + esc(i.text) + '</div>' +
-            '<div class="m">' + (bk ? esc(bk.title) : '기타') + (i.page ? ' · p.' + i.page : '') +
-            ' <button class="btn sm ghost danger" data-act="ins-del" data-i="' + i.id + '" style="padding:0 6px">삭제</button></div></div>';
-        }).join('') + '</div>';
-    }).join('') + '</div>';
-  }
-  return h;
-}
-
 function viewStats() {
   var T = today(), days = [], i;
   for (i = 13; i >= 0; i--) { var d = addDays(T, -i); days.push({ d: d, due: dueOn(d), done: doneOn(d) }); }
@@ -2051,8 +1969,7 @@ function viewSettings() {
     '<p class="small muted">2회차부터는 전체를 다시 쓰지 않고, 지난번에 틀린 줄과 그 앞뒤만 떼어 훈련합니다.</p></div>';
 
   h += '<div class="card pad"><div class="sect-h"><h2>일일 목표</h2></div>' +
-    '<div class="f2"><label class="f"><span>신규 문제 (개)</span><input type="number" id="s-new" min="0" max="20" value="' + st.newGoal + '"></label>' +
-    '<label class="f"><span>독서 (페이지)</span><input type="number" id="s-read" min="0" max="500" value="' + st.readGoal + '"></label></div></div>';
+    '<label class="f"><span>신규 문제 (개)</span><input type="number" id="s-new" min="0" max="20" value="' + st.newGoal + '"></label></div>';
 
   h += '<div class="card pad"><div class="row"><button class="btn accent" data-act="s-save">설정 저장</button>' +
     '<span class="small muted">저장 위치: ' + (S.mode === 'cloud' ? '계정 저장소 (기기 간 동기화)' : '이 브라우저') + '</span></div></div>';
@@ -2061,14 +1978,14 @@ function viewSettings() {
     '<button class="btn" data-act="sync-code">내장 코드 최신화</button>' +
     '<button class="btn" data-act="copy-json">JSON 백업 복사</button>' +
     (S.canImport ? '<button class="btn accent" data-act="import">로컬 기록 가져오기</button>' : '') +
-    '</div><div class="small muted" style="margin-top:8px">문제 ' + S.problems.length + '개 · 책 ' + S.books.length + '권 · 인사이트 ' + S.insights.length + '개</div></div>';
+    '</div><div class="small muted" style="margin-top:8px">문제 ' + S.problems.length + '개</div></div>';
 
   h += '</div>';
   return h;
 }
 
 /* ============ render ============ */
-var VIEWS = { dash: viewDash, pack: viewPack, bank: viewBank, test: viewTest, drill: viewDrill, books: viewBooks, stats: viewStats, settings: viewSettings };
+var VIEWS = { dash: viewDash, pack: viewPack, bank: viewBank, test: viewTest, drill: viewDrill, stats: viewStats, settings: viewSettings };
 function render() {
   if (S.view !== 'test' && S.view !== 'drill' && gateProblem()) S.view = 'dash';
   document.body.classList.toggle('gated', !!gateProblem() && S.view !== 'test' && S.view !== 'drill');
@@ -2643,42 +2560,6 @@ document.addEventListener('click', function (e) {
     put('problems', S.problems, Object.assign({}, p, { schedule: sc })).then(function () { render(); toast('오늘로 옮겼습니다'); });
     return;
   }
-  if (a === 'book-new') { S.bookForm = !S.bookForm; render(); return; }
-  if (a === 'book-cancel') { S.bookForm = false; render(); return; }
-  if (a === 'book-save') {
-    var bt = val('b-title'); if (!bt) { toast('책 제목을 입력하세요'); return; }
-    var b = { id: uid(), title: bt, total: num('b-total', 0), current: num('b-cur', 0), status: 'reading', createdAt: today(), log: [] };
-    put('books', S.books, b).then(function () { S.bookForm = false; render(); toast('책을 추가했습니다'); });
-    return;
-  }
-  if (a === 'book-page') {
-    var bk = S.books.filter(function (x) { return x.id === el.dataset.b; })[0]; if (!bk) return;
-    var np2 = num('pg-' + bk.id, bk.current || 0);
-    var delta = np2 - (bk.current || 0);
-    var log = (bk.log || []).slice(), T2 = today(), found = false;
-    if (delta > 0) {
-      for (var k = 0; k < log.length; k++) if (log[k].d === T2) { log[k] = { d: T2, p: log[k].p + delta }; found = true; break; }
-      if (!found) log.push({ d: T2, p: delta });
-      if (log.length > 120) log = log.slice(-120);
-    }
-    var nb = Object.assign({}, bk, { current: np2, log: log, status: (bk.total && np2 >= bk.total) ? 'done' : 'reading' });
-    put('books', S.books, nb).then(function () { render(); toast(delta > 0 ? delta + '페이지 기록' : '진도를 수정했습니다'); });
-    return;
-  }
-  if (a === 'book-del') {
-    if (!confirm('이 책을 삭제할까요? 인사이트 기록은 남습니다.')) return;
-    drop('books', S.books, el.dataset.b).then(function () { render(); });
-    return;
-  }
-  if (a === 'ins-new') { S.insForm = !S.insForm; render(); return; }
-  if (a === 'ins-cancel') { S.insForm = false; render(); return; }
-  if (a === 'ins-save') {
-    var tx = val('i-text'); if (!tx) { toast('내용을 입력하세요'); return; }
-    var ins = { id: uid(), bookId: val('i-book'), page: num('i-page', 0), text: tx, date: today() };
-    put('insights', S.insights, ins).then(function () { S.insForm = false; render(); toast('인사이트를 기록했습니다'); });
-    return;
-  }
-  if (a === 'ins-del') { drop('insights', S.insights, el.dataset.i).then(function () { render(); }); return; }
   if (a === 's-save') {
     var iv = val('s-int').split(',').map(function (x) { return parseInt(x.trim(), 10); })
       .filter(function (x) { return !isNaN(x) && x > 0 && x < 400; });
@@ -2687,7 +2568,6 @@ document.addEventListener('click', function (e) {
     S.settings = Object.assign({}, S.settings, {
       intervals: iv, pass: clamp(num('s-pass', 80), 10, 100),
       retry: val('s-retry') === '1', newGoal: clamp(num('s-new', 1), 0, 20),
-      readGoal: clamp(num('s-read', 20), 0, 500),
       streakNeed: clamp(num('s-streak', 3), 1, 10),
       secPerLine: clamp(num('s-spl', 10), 2, 60),
       baseSec: clamp(num('s-base', 30), 0, 300),

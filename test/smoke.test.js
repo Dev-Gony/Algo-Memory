@@ -348,6 +348,21 @@ test('문제 은행 행이 눌린다는 표시가 있다', async () => {
   assert.strictEqual(t.d.querySelector('.prow .chev').textContent, '⌄', '펼치면 방향이 바뀐다');
 });
 
+test('독서·인사이트는 화면에서 사라졌지만 데이터는 남는다', async () => {
+  const t = open({ storage: {
+    problems: [problem()], books: [{ id: 'b1', title: '옛 책', total: 100, current: 10 }],
+    insights: [{ id: 'i1', text: '옛 기록', date: today() }], daily: {}, settings: {}
+  } });
+  await t.tick();
+  assert.ok(!t.d.querySelector('[data-v="books"]'), '탭이 없어야 한다');
+  assert.ok(!t.d.getElementById('v-books'), '뷰가 없어야 한다');
+  assert.ok(!t.d.body.textContent.includes('독서'), '독서 흔적이 남으면 안 된다');
+  assert.strictEqual(t.d.querySelectorAll('.today-strip .tile').length, 4, '타일이 4개로 줄어야 한다');
+  const ls = t.local();
+  assert.strictEqual(ls.books.length, 1, '저장된 책 데이터는 지우지 않는다');
+  assert.strictEqual(ls.insights.length, 1, '인사이트도 그대로');
+});
+
 (async () => {
   let failed = 0;
   for (const c of cases) {
