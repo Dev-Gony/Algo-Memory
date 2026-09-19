@@ -80,14 +80,15 @@ function ordOf(p) { return (p && p.srcId != null && ORD[p.srcId] != null) ? ORD[
 var DEFAULTS = {
   intervals: [1, 3, 7, 14, 30], pass: 80, retry: true, readGoal: 20, newGoal: 1,
   streakNeed: 3, secPerLine: 10, baseSec: 30, decayDays: 30, gate: false, gateDone: '', gateSkip: 0,
-  trialMax: 10, bankSort: 'lv'
+  trialMax: 10, bankSort: 'lv', drillNote: true
 };
 var S = {
   problems: [], books: [], insights: [], settings: Object.assign({}, DEFAULTS),
   view: 'dash', form: null, bookForm: false, insForm: false, sel: null,
   filter: { q: '', cat: '', lv: '' }, test: null, pending: false, mode: 'local', canImport: false,
   packSel: {}, packPerDay: 2, packLv: 1,
-  drill: null, daily: {}, courseSel: null, hist: []
+  drill: null, daily: {}, courseSel: null, hist: [],
+  detailTab: 'note', explainOpen: null, explainShown: null
 };
 
 /* ============ storage ============ */
@@ -469,6 +470,18 @@ function syncCatalogCode() {
   });
   fixes.forEach(function (np) { put('problems', S.problems, np); });
   return fixes.length;
+}
+function noteOf(p) {
+  if (!p || !p.srcId) return null;
+  var c = CATALOG.filter(function (x) { return x.id === p.srcId; })[0];
+  return c && c.story ? c : null;
+}
+function walkRows(p) {
+  var c = noteOf(p);
+  if (!c || !c.walk || !c.walk.length) return null;
+  var lines = catalogCode(p).split('\n').filter(function (l) { return l.trim(); });
+  if (lines.length !== c.walk.length) return null;
+  return lines.map(function (l, i) { return { code: l, note: c.walk[i] }; });
 }
 function catalogCode(p) {
   var c = p.srcId && CATALOG.filter(function (x) { return x.id === p.srcId; })[0];
@@ -994,47 +1007,148 @@ function viewBank() {
 }
 
 function problemDetail(p) {
-  var sc = p.schedule || [];
-  var nextIdx = -1;
-  sc.forEach(function (x, i) { if (nextIdx < 0 && !x.done) nextIdx = i; });
-  return '<div class="card pad detail">' +
+  var tab = S.detailTab || 'note';
+  var c = noteOf(p);
+  var h = '<div class="card pad detail">' +
     '<div class="row" style="margin-bottom:12px"><span class="chip accent">' + esc(p.category || '미분류') + '</span>' +
     '<span class="chip mono">' + esc(LANG_LABEL[p.lang] || p.lang || 'Python') + '</span>' +
     '<span class="grow"></span>' +
     masteryChip(mastery(p)) +
     '<span class="chip mono">깜지 ' + (p.trial || 1) + '회</span>' +
     '<button class="btn sm accent" data-act="train" data-p="' + p.id + '">훈련</button>' +
-    '<button class="btn sm" data-act="live" data-p="' + p.id + '">실전</button></div>' +
-    '<dl class="kv">' +
-    (p.brief ? '<dt>문제 설명</dt><dd>' + esc(p.brief) + '</dd>' : '') +
-    (p.url ? '<dt>문제 링크</dt><dd><a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.url) + '</a></dd>' : '') +
-    (p.limits ? '<dt>제한 조건</dt><dd>' + esc(p.limits) + '</dd>' : '') +
-    (p.logic ? '<dt>핵심 로직</dt><dd style="white-space:pre-wrap">' + esc(p.logic) + '</dd>' : '') +
-    '<dt>등록일</dt><dd class="mono">' + esc(p.createdAt) + '</dd>' +
-    '</dl>' +
-    '<hr class="sep"><div class="sect-h"><h2 style="font-size:14px">복습 일정</h2></div>' +
-    '<div class="hbars">' + sc.map(function (s, i) {
-      var st = s.done ? '<span class="chip accent">완료 ' + (s.rate != null ? s.rate + '%' : '') + '</span>'
-        : (dayDiff(s.due, today()) > 0 ? '<span class="chip bad">지연</span>'
-          : (s.due === today() ? '<span class="chip warn">오늘</span>' : '<span class="chip">예정</span>'));
-      return '<div class="row small" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">' +
-        '<span class="mono">' + s.round + '회차' + (s.retry ? ' (재)' : '') + '</span>' +
-        '<span class="mono muted">' + esc(s.due) + '</span>' + st +
-        (i === nextIdx ? '<button class="btn sm" data-act="live" data-p="' + p.id + '" data-i="' + i + '">실전</button>' : '') +
-        '</div>';
-    }).join('') + '</div>' +
-    '<hr class="sep">' +
-    ((p.attempts || []).length ? '<details class="fold"><summary>테스트 기록 ' + p.attempts.length + '회</summary><div class="hbars" style="margin-top:8px">' +
-      p.attempts.slice().reverse().slice(0, 12).map(function (a) {
-        return '<div class="hb"><span class="mono muted">' + esc(a.at) + '</span>' +
-          '<span class="track"><i class="' + (a.rate >= S.settings.pass ? '' : (a.rate >= 60 ? 'w' : 'b')) + '" style="width:' + a.rate + '%"></i></span>' +
-          '<span class="v">' + a.rate + '%</span></div>';
-      }).join('') + '</div></details>' : '') +
-    '<hr class="sep"><div class="row">' +
+    '<button class="btn sm" data-act="live" data-p="' + p.id + '">실전</button></div>';
+
+  h += '<div class="lvtabs" style="margin-bottom:14px">' +
+    [['note', '해설'], ['sched', '복습 일정'], ['log', '기록']].map(function (t) {
+      return '<button class="lvtab' + (tab === t[0] ? ' on' : '') + '" data-act="dtab" data-t="' + t[0] + '">' + t[1] + '</button>';
+    }).join('') + '</div>';
+
+  if (tab === 'note') h += detailNote(p, c);
+  else if (tab === 'sched') h += detailSched(p);
+  else h += detailLog(p);
+
+  h += '<hr class="sep"><div class="row">' +
     '<span class="small muted grow">코드를 자기 스타일로 바꾸고 싶을 때만 쓰세요</span>' +
     '<button class="btn sm ghost" data-act="form-edit" data-p="' + p.id + '">코드 수정</button>' +
     '<button class="btn sm ghost danger" data-act="del-p" data-p="' + p.id + '">삭제</button></div>' +
     '</div>';
+  return h;
+}
+
+function detailNote(p, c) {
+  var h = '';
+  if (c) {
+    h += '<p style="font-size:14.5px;line-height:1.7;margin-bottom:12px">' + esc(c.story) + '</p>' +
+      '<dl class="kv" style="margin-bottom:14px">' +
+      '<dt>어디에 쓰나</dt><dd>' + esc(c.where) + '</dd>' +
+      '<dt>기억할 것</dt><dd><ul style="margin:0;padding-left:18px">' +
+      c.keys.map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></dd>' +
+      (p.limits ? '<dt>제한 조건</dt><dd class="mono small">' + esc(p.limits) + '</dd>' : '') +
+      '</dl>';
+  } else {
+    h += '<dl class="kv" style="margin-bottom:14px">' +
+      (p.brief ? '<dt>문제 설명</dt><dd>' + esc(p.brief) + '</dd>' : '') +
+      (p.limits ? '<dt>제한 조건</dt><dd>' + esc(p.limits) + '</dd>' : '') +
+      (p.logic ? '<dt>핵심 로직</dt><dd style="white-space:pre-wrap">' + esc(p.logic) + '</dd>' : '') +
+      '</dl>';
+  }
+
+  var rows = walkRows(p);
+  if (rows) {
+    h += '<div class="sect-h"><h2 style="font-size:14px">줄별 해설</h2>' +
+      '<span class="sub">한 줄씩 무슨 뜻인지</span></div>' +
+      '<div class="walk">' + rows.map(function (r, i) {
+        return '<div class="wrow"><div class="wn mono">' + (i + 1) + '</div>' +
+          '<div class="wc"><pre class="code" style="border:none;background:transparent;padding:0;margin:0">' + hl(r.code) + '</pre>' +
+          (r.note ? '<div class="wt">' + esc(r.note) + '</div>' : '') + '</div></div>';
+      }).join('') + '</div>';
+  } else {
+    h += '<details class="fold"><summary>코드 보기</summary><pre class="code" style="margin-top:8px">' +
+      hl(catalogCode(p)) + '</pre></details>';
+  }
+
+  h += explainBlock(p, c);
+  return h;
+}
+
+function explainBlock(p, c) {
+  var done = mastery(p).k === 'done';
+  var mine = p.explain;
+  var h = '<hr class="sep"><div class="sect-h"><h2 style="font-size:14px">내 말로 설명하기</h2>' +
+    '<span class="sub">' + (done ? '암기 완료 — 이제 이해로 넘어갈 차례입니다' : '외운 뒤에 하면 좋습니다') + '</span></div>';
+
+  if (S.explainOpen !== p.id && !mine) {
+    return h + '<div class="row"><button class="btn' + (done ? ' accent' : '') + '" data-act="explain-open" data-p="' + p.id + '">세 문장으로 설명해 보기</button>' +
+      '<span class="small muted">쓰고 나면 모범 해설과 나란히 보여드립니다</span></div>';
+  }
+
+  if (mine && S.explainOpen !== p.id) {
+    h += '<div class="card pad" style="background:var(--panel-2);box-shadow:none">' +
+      ['어디에 쓰나', '핵심 원리', '자주 틀리는 곳'].map(function (lab, i) {
+        return '<div style="margin-bottom:8px"><div class="small muted">' + lab + '</div>' +
+          '<div style="white-space:pre-wrap">' + esc(mine.a[i] || '(안 씀)') + '</div></div>';
+      }).join('') +
+      '<div class="row small muted" style="margin-top:6px">' + esc(mine.date) + ' 작성' +
+      (mine.ok === true ? ' · 스스로 통과' : (mine.ok === false ? ' · 더 볼 것' : '')) +
+      '<span class="grow"></span>' +
+      '<button class="btn sm ghost" data-act="explain-open" data-p="' + p.id + '">다시 쓰기</button></div></div>';
+    return h;
+  }
+
+  /* 작성 모드 */
+  var shown = S.explainShown === p.id;
+  var pre = (mine && mine.a) || ['', '', ''];
+  h += '<label class="f"><span>1. 이 알고리즘은 어디에 쓰나</span><textarea id="ex-0" style="min-height:60px">' + esc(pre[0]) + '</textarea></label>' +
+    '<label class="f"><span>2. 핵심 원리가 무엇인가</span><textarea id="ex-1" style="min-height:60px">' + esc(pre[1]) + '</textarea></label>' +
+    '<label class="f"><span>3. 가장 자주 틀리는 부분은</span><textarea id="ex-2" style="min-height:60px">' + esc(pre[2]) + '</textarea></label>';
+
+  if (!shown) {
+    h += '<div class="row"><button class="btn accent" data-act="explain-show" data-p="' + p.id + '">다 썼습니다 · 모범 해설 보기</button>' +
+      '<button class="btn ghost" data-act="explain-cancel">취소</button>' +
+      '<span class="small muted">서술형이라 자동 채점은 안 됩니다. 대조해 보고 스스로 판정하세요.</span></div>';
+    return h;
+  }
+
+  h += '<div class="card pad" style="border-color:var(--accent);margin-bottom:12px">' +
+    '<div class="small muted" style="margin-bottom:8px">모범 해설</div>' +
+    (c ? '<div style="margin-bottom:8px"><div class="small muted">어디에 쓰나</div><div>' + esc(c.where) + '</div></div>' +
+      '<div style="margin-bottom:8px"><div class="small muted">핵심 원리</div><div>' + esc(c.story) + '</div></div>' +
+      '<div><div class="small muted">자주 틀리는 곳</div><ul style="margin:4px 0 0;padding-left:18px">' +
+      c.keys.map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></div>'
+      : '<div class="muted">이 문제에는 모범 해설이 없습니다. 직접 등록한 문제입니다.</div>') +
+    '</div>' +
+    '<div class="row"><span class="small grow">빠뜨린 게 있나요? 스스로 판정하세요.</span>' +
+    '<button class="btn accent" data-act="explain-save" data-p="' + p.id + '" data-ok="1">거의 다 맞았다</button>' +
+    '<button class="btn" data-act="explain-save" data-p="' + p.id + '" data-ok="0">더 봐야겠다</button></div>';
+  return h;
+}
+
+function detailSched(p) {
+  var sc = p.schedule || [], nextIdx = -1;
+  sc.forEach(function (x, i) { if (nextIdx < 0 && !x.done) nextIdx = i; });
+  return '<div class="hbars">' + sc.map(function (s, i) {
+    var st = s.done ? '<span class="chip accent">완료 ' + (s.rate != null ? s.rate + '%' : '') + '</span>'
+      : (dayDiff(s.due, today()) > 0 ? '<span class="chip bad">지연</span>'
+        : (s.due === today() ? '<span class="chip warn">오늘</span>' : '<span class="chip">예정</span>'));
+    return '<div class="row small" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">' +
+      '<span class="mono">' + s.round + '회차' + (s.retry ? ' (재)' : '') + '</span>' +
+      '<span class="mono muted">' + esc(s.due) + '</span>' + st +
+      (i === nextIdx ? '<button class="btn sm" data-act="live" data-p="' + p.id + '" data-i="' + i + '">실전</button>' : '') +
+      '</div>';
+  }).join('') + '</div>' +
+  '<div class="small muted" style="margin-top:10px">등록일 ' + esc(p.createdAt) +
+  (p.url ? ' · <a href="' + esc(p.url) + '" target="_blank" rel="noopener">문제 링크</a>' : '') + '</div>';
+}
+
+function detailLog(p) {
+  var att = (p.attempts || []).slice().reverse();
+  if (!att.length) return '<div class="empty">아직 실전 기록이 없습니다.</div>';
+  return '<div class="hbars">' + att.slice(0, 16).map(function (a) {
+    return '<div class="hb"><span class="mono muted">' + esc(a.at) + '</span>' +
+      '<span class="track"><i class="' + (a.perfect ? '' : (a.rate >= 60 ? 'w' : 'b')) + '" style="width:' + a.rate + '%"></i></span>' +
+      '<span class="v">' + a.rate + '%</span></div>' +
+      ((a.miss && a.miss.length) ? '<div class="small muted" style="margin:-4px 0 4px 96px">누락 ' + esc(a.miss.join(', ')) + '</div>' : '');
+  }).join('') + '</div>';
 }
 
 function viewTest() {
@@ -1147,7 +1261,9 @@ function viewDrill() {
     '<div class="bar" style="margin-bottom:6px"><i id="traceBar" style="width:0%"></i></div>' +
     '<div class="editbar" style="margin:0 0 12px">' +
     '<span id="traceStat" class="mono">0%</span><span class="grow"></span>' +
+    (dr.walk ? '<button class="btn sm ghost" data-act="drill-note">해설 ' + (dr.showNote ? '숨기기' : '보기') + '</button>' : '') +
     '<span class="muted">들여쓰기는 자동으로 넘어갑니다 · 영문 입력 상태로</span></div>' +
+    (dr.walk && dr.showNote ? '<div class="hintbox" id="traceNote" style="margin-bottom:10px;min-height:66px"></div>' : '') +
     '<div class="hintbox" id="traceWarn" style="display:none;margin-bottom:10px"></div>' +
     '<div class="tracebox" id="tracebox" data-act="trace-focus">' +
     '<pre class="traceview" id="traceview"></pre>' +
@@ -1447,7 +1563,7 @@ window.addEventListener('popstate', function () {
   if (HIST.depth > 0) HIST.depth--;
   doBack();
 });
-var KEEP = /^(f-|b-|i-|s-|pg-|pack-per$|c-pace$|q$|qcat$|qlv$|qsort$)/;
+var KEEP = /^(f-|b-|i-|s-|ex-|pg-|pack-per$|c-pace$|q$|qcat$|qlv$|qsort$)/;
 /* codeInput is excluded below */
 function snapInputs() {
   var o = {};
@@ -1557,8 +1673,15 @@ function startTest(pid, idx, opt) {
 function startDrill(pid, idx) {
   var p = S.problems.filter(function (x) { return x.id === pid; })[0]; if (!p) return;
   var t = traceTarget({ code: catalogCode(p) });
+  var wr = walkRows(p);
+  var wmap = null;
+  if (wr) {
+    var wi = -1;
+    wmap = t.split('\n').map(function (l) { if (l.trim()) { wi++; return wi; } return -1; });
+  }
   S.drill = {
     pid: pid, idx: (idx == null ? null : idx), target: t,
+    walk: wr, wmap: wmap, showNote: S.settings.drillNote !== false,
     need: clamp(p.trial || 1, 1, S.settings.trialMax || 10),
     done: 0, pos: 0, errors: 0, written: 0, startedAt: Date.now()
   };
@@ -1578,6 +1701,19 @@ function paintTrace() {
   if (el) { try { el.scrollIntoView({ block: 'nearest' }); } catch (e) { } }
   var bar = document.getElementById('traceBar');
   if (bar) bar.style.width = (t.length ? pos / t.length * 100 : 0) + '%';
+  var np = document.getElementById('traceNote');
+  if (np && dr.walk && dr.wmap && dr.showNote) {
+    var li = t.slice(0, Math.min(pos, t.length - 1) + (pos >= t.length ? 0 : 0)).split('\n').length - 1;
+    if (pos >= t.length) li = t.split('\n').length - 1;
+    var wi2 = dr.wmap[li];
+    while (wi2 < 0 && li > 0) { li--; wi2 = dr.wmap[li]; }
+    var row = wi2 >= 0 ? dr.walk[wi2] : null;
+    np.innerHTML = row
+      ? '<div class="small muted" style="margin-bottom:4px">' + (wi2 + 1) + '번째 줄</div>' +
+        '<div class="mono small" style="margin-bottom:6px;color:var(--accent)">' + esc(row.code.trim()) + '</div>' +
+        '<div>' + esc(row.note) + '</div>'
+      : '';
+  }
   var st = document.getElementById('traceStat');
   if (st) st.textContent = Math.round(t.length ? pos / t.length * 100 : 0) + '% · 남은 글자 ' +
     (t.length - pos) + ' · 오타 ' + dr.errors;
@@ -1741,7 +1877,7 @@ function finishTest(retrain) {
     }
     back();
     toast(perfect
-      ? (streak >= need ? '암기 완료 — ' + S.settings.decayDays + '일 뒤 재확인이 잡힙니다'
+      ? (streak >= need ? '암기 완료 — 이제 해설 탭에서 세 문장으로 설명해 보세요'
         : '완벽 재현 ' + streak + '/' + need)
       : '깜지 ' + trial + '회로 올랐습니다');
   });
@@ -1760,9 +1896,33 @@ document.addEventListener('click', function (e) {
 
   if (a === 'select') {
     if (e.target.closest('[data-act]') !== el) return;
-    S.sel = (S.sel === el.dataset.p) ? null : el.dataset.p; render(); return;
+    S.sel = (S.sel === el.dataset.p) ? null : el.dataset.p;
+    S.detailTab = 'note'; S.explainOpen = null; S.explainShown = null;
+    render(); return;
   }
   if (a === 'back') { back(); return; }
+  if (a === 'dtab') { S.detailTab = el.dataset.t; render(); return; }
+  if (a === 'explain-open') {
+    S.explainOpen = el.dataset.p; S.explainShown = null; S.detailTab = 'note'; render(); return;
+  }
+  if (a === 'explain-cancel') { S.explainOpen = null; S.explainShown = null; render(); return; }
+  if (a === 'explain-show') {
+    S.exDraft = [val('ex-0'), val('ex-1'), val('ex-2')];
+    if (!S.exDraft.join('').trim()) { toast('한 줄이라도 써 보세요'); return; }
+    S.explainShown = el.dataset.p; render(); return;
+  }
+  if (a === 'explain-save') {
+    var ep = S.problems.filter(function (x) { return x.id === el.dataset.p; })[0]; if (!ep) return;
+    var a3 = S.exDraft || ['', '', ''];
+    put('problems', S.problems, Object.assign({}, ep, {
+      explain: { a: a3, date: today(), ok: el.dataset.ok === '1' }
+    })).then(function () {
+      S.explainOpen = null; S.explainShown = null; S.exDraft = null;
+      render();
+      toast(el.dataset.ok === '1' ? '설명까지 마쳤습니다' : '해설을 다시 읽어보세요');
+    });
+    return;
+  }
   if (a === 'course-open') {
     S.hist.push(navSnap());
     S.courseSel = el.dataset.c; S.view = 'pack';
@@ -1802,6 +1962,11 @@ document.addEventListener('click', function (e) {
     return;
   }
   if (a === 'drill-next') { finishPass(); return; }
+  if (a === 'drill-note') {
+    S.drill.showNote = !S.drill.showNote;
+    S.settings.drillNote = S.drill.showNote; saveSettings();
+    render(); return;
+  }
   if (a === 'trace-focus') { var ti = document.getElementById('tracein'); if (ti) ti.focus(); return; }
   if (a === 'train') { startDrill(el.dataset.p, el.dataset.i == null ? null : parseInt(el.dataset.i, 10)); return; }
   if (a === 'live') { startTest(el.dataset.p, el.dataset.i == null ? null : parseInt(el.dataset.i, 10), {}); return; }

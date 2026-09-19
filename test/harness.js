@@ -4,6 +4,13 @@ const { JSDOM, VirtualConsole } = require('jsdom');
 
 const BUILT = path.join(__dirname, '..', 'dist', 'algo-memory.html');
 
+const pad = (n) => String(n).padStart(2, '0');
+/** 앱과 같은 방식으로 오늘 날짜를 만든다. 테스트에 날짜를 하드코딩하지 않는다. */
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
 function open({ storage, db } = {}) {
   const html = fs.readFileSync(BUILT, 'utf8');
   const errors = [];
@@ -54,4 +61,4 @@ function open({ storage, db } = {}) {
   };
   return api;
 }
-module.exports = { open };
+module.exports = { open, today };
