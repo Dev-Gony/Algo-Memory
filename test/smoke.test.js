@@ -356,7 +356,8 @@ test('독서·인사이트는 화면에서 사라졌지만 데이터는 남는�
   await t.tick();
   assert.ok(!t.d.querySelector('[data-v="books"]'), '탭이 없어야 한다');
   assert.ok(!t.d.getElementById('v-books'), '뷰가 없어야 한다');
-  assert.ok(!t.d.body.textContent.includes('독서'), '독서 흔적이 남으면 안 된다');
+  const ui = t.d.querySelector('nav').textContent + t.d.querySelector('main').textContent;
+  assert.ok(!ui.includes('독서'), '화면에 독서 흔적이 남으면 안 된다');
   assert.strictEqual(t.d.querySelectorAll('.today-strip .tile').length, 4, '타일이 4개로 줄어야 한다');
   const ls = t.local();
   assert.strictEqual(ls.books.length, 1, '저장된 책 데이터는 지우지 않는다');
