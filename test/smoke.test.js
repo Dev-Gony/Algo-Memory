@@ -313,6 +313,41 @@ test('취약한 문제가 오늘 목록 앞에 온다', async () => {
   assert.ok(t.texts('#v-dash .qrow')[0].includes('취약'), '취약 표시');
 });
 
+test('코스 상세에서 동작 버튼이 칩과 구분되고 오늘 차례가 표시된다', async () => {
+  const t = open(); await t.tick();
+  t.click('#nav button[data-v="pack"]'); await t.tick();
+  assert.strictEqual(t.d.querySelectorAll('.course .chev').length, 6, '코스 카드가 눌린다는 표시');
+  t.click('.course'); await t.tick();
+  t.click('[data-act="course-start"]'); await t.tick(200);
+  t.click('#nav button[data-v="pack"]'); await t.tick();
+  t.click('.course'); await t.tick();
+
+  const first = t.d.querySelector('.pk');
+  const btns = [...first.querySelectorAll('.btn')];
+  assert.strictEqual(btns.length, 2, '훈련 / 실전');
+  assert.ok(btns[0].className.includes('accent'), '훈련은 강조 버튼이어야 한다: ' + btns[0].className);
+  assert.ok(!btns.some((b) => b.className.includes('ghost')), '동작 버튼에 ghost 를 쓰지 않는다');
+
+  const chips = [...first.querySelectorAll('.chip')].map((e) => e.textContent.trim());
+  assert.ok(!chips.some((c) => c.includes('기초 문법')), '코스 안에서 카테고리 칩은 중복 정보');
+  assert.ok(!chips.some((c) => c.includes('깜지 1회')), '한 번도 안 틀렸으면 깜지 칩을 숨긴다');
+
+  assert.ok(first.classList.contains('now'), '오늘 차례 강조');
+  assert.strictEqual(t.d.querySelectorAll('.pk.now').length, 2, '하루 2개 기준이면 2개만 오늘');
+  assert.ok(t.d.querySelector('[data-act="go-dash"]'), '전부 등록 뒤에는 오늘 차례로 가는 버튼');
+  const bar = t.d.querySelector('.bar2');
+  assert.strictEqual(bar.querySelector('.reg').style.width, '100%', '등록 진행이 막대에 보여야 한다');
+});
+
+test('문제 은행 행이 눌린다는 표시가 있다', async () => {
+  const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  assert.strictEqual(t.d.querySelector('.prow .chev').textContent, '›');
+  t.click('.prow'); await t.tick();
+  assert.strictEqual(t.d.querySelector('.prow .chev').textContent, '⌄', '펼치면 방향이 바뀐다');
+});
+
 (async () => {
   let failed = 0;
   for (const c of cases) {
