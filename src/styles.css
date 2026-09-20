@@ -238,6 +238,27 @@ pre.code{
 #codeInput:focus{background:transparent}
 .editbar{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:12px;color:var(--ink-3);flex-wrap:wrap}
 
+.guidewrap{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:16px;align-items:start}
+.guidecol{
+  position:sticky;top:96px;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:14px;max-height:66vh;overflow-y:auto;box-shadow:var(--shadow);
+}
+ol.guide{margin:0;padding:0;list-style:none;counter-reset:g}
+ol.guide li{
+  counter-increment:g;position:relative;padding:7px 8px 7px 30px;font-size:12.9px;line-height:1.6;
+  color:var(--ink-3);border-radius:8px;transition:background .15s ease,color .15s ease;
+}
+ol.guide li::before{
+  content:counter(g);position:absolute;left:6px;top:7px;width:17px;height:17px;border-radius:50%;
+  background:var(--panel-2);border:1px solid var(--line);font-family:var(--mono);font-size:10px;
+  display:grid;place-items:center;color:var(--ink-3);
+}
+ol.guide li.done{color:var(--ink-3);opacity:.5}
+ol.guide li.done::before{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+ol.guide li.on{background:var(--accent-soft);color:var(--ink)}
+ol.guide li.on::before{background:var(--accent);border-color:transparent;color:var(--bg)}
+.editcol{min-width:0}
+
 .score{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .score .num{font-family:var(--mono);font-size:52px;font-weight:600;line-height:1;letter-spacing:-.03em}
 .score .num em{font-style:normal;font-size:20px;color:var(--ink-3)}
@@ -462,6 +483,8 @@ details.fold[open] > summary::before{content:"▾ "}
   nav{padding:0 13px 8px}
   .pk .row.small{flex-wrap:wrap}
   .pk .row.small .grow{flex-basis:100%;height:0}
+  .guidewrap{grid-template-columns:1fr}
+  .guidecol{position:static;max-height:230px}
   .score .num{font-size:40px}
   .stamp{width:62px;height:62px;font-size:13px}
   .f3{grid-template-columns:1fr}

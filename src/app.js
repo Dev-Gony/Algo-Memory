@@ -121,7 +121,8 @@ function ordOf(p) { return (p && p.srcId != null && ORD[p.srcId] != null) ? ORD[
 var DEFAULTS = {
   intervals: [1, 3, 7, 14, 30], pass: 80, retry: true, newGoal: 1,
   streakNeed: 3, secPerLine: 10, baseSec: 30, decayDays: 30, gate: false, gateDone: '', gateSkip: 0,
-  trialMax: 10, bankSort: 'lv', drillNote: true, grace: 1, restAfter: 3, demo: false, seenLanding: false
+  trialMax: 10, bankSort: 'lv', drillNote: true, grace: 1, restAfter: 3, demo: false, seenLanding: false,
+  guideStep: true
 };
 var S = {
   problems: [], books: [], insights: [], settings: Object.assign({}, DEFAULTS),
@@ -600,6 +601,27 @@ function syncCatalogCode() {
   });
   fixes.forEach(function (np) { put('problems', S.problems, np); });
   return fixes.length;
+}
+/* 실전 전 단계에서 보여줄 안내 목록.
+   줄별 해설이 있으면 그걸 순서대로, 없으면 설명과 핵심 포인트로 대신한다. */
+function guideItems(p) {
+  var rows = walkRows(p);
+  if (rows) {
+    return {
+      kind: 'walk',
+      items: rows.map(function (r) { return r.note || '(이 줄은 설명이 없습니다)'; })
+    };
+  }
+  var c = noteOf(p);
+  var out = [];
+  if (p.brief) out.push(p.brief);
+  if (c && c.story) out.push(c.story);
+  if (p.logic) out.push(p.logic);
+  if (c && c.keys) c.keys.forEach(function (k) { out.push(k); });
+  return { kind: 'rough', items: out.length ? out : ['이 문제에는 등록된 해설이 없습니다.'] };
+}
+function everPassed(p) {
+  return (p.attempts || []).some(function (a) { return a.perfect && !a.guide; });
 }
 function noteOf(p) {
   if (!p || !p.srcId) return null;
@@ -1370,6 +1392,7 @@ function problemDetail(p) {
     masteryChip(mastery(p)) +
     '<span class="chip mono">깜지 ' + (p.trial || 1) + '회</span>' +
     '<button class="btn sm accent" data-act="train" data-p="' + p.id + '">훈련</button>' +
+    '<button class="btn sm" data-act="guide" data-p="' + p.id + '">설명 보고</button>' +
     '<button class="btn sm" data-act="live" data-p="' + p.id + '">실전</button></div>';
 
   h += '<div class="lvtabs" style="margin-bottom:14px">' +
@@ -1512,21 +1535,37 @@ function viewTest() {
   var lim = timeLimit(p);
 
   if (!t.result) {
-    var modeLabel = t.gate ? '오늘의 관문' : (t.idx != null ? t.round + '회차 복습' : '실전');
+    var modeLabel = t.guide ? '설명 보고 쓰기'
+      : (t.gate ? '오늘의 관문' : (t.idx != null ? t.round + '회차 복습' : '실전'));
+    var g = t.guide ? guideItems(p) : null;
     return '<div class="testhead">' +
       '<button class="btn ghost sm" data-act="test-exit">← 나가기</button>' +
       '<div class="grow"><h2>' + esc(p.title) + '</h2>' +
       '<div class="small muted"><span class="chip">' + esc(p.category || '미분류') + '</span> ' +
       esc(modeLabel) + ' · 원본 ' + normLines(p) + '줄 · 제한 ' + mmss(lim) + '</div></div>' +
       '<div class="timer mono" id="timer">00:00</div></div>' +
-      '<div class="hintbox" style="border-style:solid;border-color:var(--bad);color:var(--bad)">' +
-      '실전입니다. 100% 재현 + 구조 누락 0 + 제한 시간 내여야 통과입니다. 막히면 아래 모르겠다를 누르세요.</div>' +
+      (t.guide
+        ? '<div class="hintbox">설명을 순서대로 읽으면서 그에 맞는 코드를 적으세요. ' +
+          '코드를 보여주지는 않습니다. 이 단계는 암기 판정에 들어가지 않습니다.</div>'
+        : '<div class="hintbox" style="border-style:solid;border-color:var(--bad);color:var(--bad)">' +
+          '실전입니다. 구조 누락 0 + 빠진 줄 0 + 제한 시간 내여야 통과입니다. 막히면 아래 모르겠다를 누르세요.</div>') +
+      '<div class="' + (t.guide ? 'guidewrap' : '') + '">' +
+      (g
+        ? '<div class="guidecol"><div class="small muted" style="margin-bottom:8px">' +
+          (g.kind === 'walk' ? '줄 순서대로 ' + g.items.length + '개' : '이 문제의 설명') + '</div>' +
+          '<ol class="guide" id="guideList">' +
+          g.items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') +
+          '</ol></div>'
+        : '') +
+      '<div class="editcol">' +
       '<div class="editor-wrap"><div class="gutter" id="gutter">1</div>' +
-      '<textarea id="codeInput" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="빈 화면에서 정답 코드를 처음부터 끝까지 작성하세요."></textarea></div>' +
+      '<textarea id="codeInput" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="' +
+      (t.guide ? '왼쪽 설명을 보면서 코드를 적으세요.' : '빈 화면에서 정답 코드를 처음부터 끝까지 작성하세요.') + '"></textarea></div>' +
       '<div class="editbar"><span id="counter" class="mono">0줄 · 0자</span><span class="grow"></span>' +
       '<span>Tab 들여쓰기 · Ctrl/⌘+Enter 제출</span>' +
-      '<button class="btn danger" data-act="giveup">모르겠다</button>' +
-      '<button class="btn accent" data-act="submit">제출하고 채점</button></div>';
+      (t.guide ? '' : '<button class="btn danger" data-act="giveup">모르겠다</button>') +
+      '<button class="btn accent" data-act="submit">제출하고 채점</button></div>' +
+      '</div></div>';
   }
 
   var r = t.result, v = t.verdict, m = mastery(p);
@@ -1538,17 +1577,22 @@ function viewTest() {
   /* ---- 암기 판정 ---- */
   h += '<div class="card pad verdict-card ' + (v.perfect ? 'ok' : 'no') + '" style="margin-bottom:14px">' +
     '<div class="row" style="align-items:center;gap:14px">' +
-    '<div class="stamp ' + (v.perfect ? 'ok' : 'no') + '">' + (v.perfect ? '암기<br>확인' : '아직') + '</div>' +
+    '<div class="stamp ' + (v.perfect ? 'ok' : 'no') + '">' +
+    (t.guide ? (v.perfect ? '옮기기<br>성공' : '아직') : (v.perfect ? '암기<br>확인' : '아직')) + '</div>' +
     '<div class="grow"><h2 style="font-size:17px">' +
     (v.perfect
-      ? (v.clean ? '완벽 재현했습니다' : '통과 — 오타 ' + v.surface + '개는 봐줬습니다')
+      ? (t.guide ? '설명대로 옮겼습니다' : (v.clean ? '완벽 재현했습니다' : '통과 — 오타 ' + v.surface + '개는 봐줬습니다'))
       : '아직 재현이 안 됩니다') + '</h2>' +
     '<div class="small muted" style="margin-top:2px">' +
-    (v.perfect
-      ? (nextStreak >= S.settings.streakNeed
-        ? '연속 ' + nextStreak + '회 — 이 문제는 암기 완료로 올라갑니다.'
-        : '연속 ' + nextStreak + '/' + S.settings.streakNeed + ' — ' + (S.settings.streakNeed - nextStreak) + '회 더 완벽하면 암기 완료입니다.')
-      : '네 조건 중 하나라도 어긋나면 연속 기록은 0으로 돌아갑니다. 현재 연속 ' + (p.streak || 0) + '회.') +
+    (t.guide
+      ? (v.perfect
+        ? '설명을 보고 쓴 단계라 암기 판정에는 넣지 않습니다. 이제 아무것도 없이 써 볼 차례입니다.'
+        : '설명을 보고도 막혔다면 아직 손에 안 붙은 겁니다. 깜지를 한 번 더 하는 편이 낫습니다.')
+      : (v.perfect
+        ? (nextStreak >= S.settings.streakNeed
+          ? '연속 ' + nextStreak + '회 — 이 문제는 암기 완료로 올라갑니다.'
+          : '연속 ' + nextStreak + '/' + S.settings.streakNeed + ' — ' + (S.settings.streakNeed - nextStreak) + '회 더 완벽하면 암기 완료입니다.')
+        : '조건 중 하나라도 어긋나면 연속 기록은 0으로 돌아갑니다. 현재 연속 ' + (p.streak || 0) + '회.')) +
     '</div></div></div>' +
     '<div class="checklist" style="margin-top:14px">' +
     [['핵심 구조 누락 없음', v.missing === 0, v.missing + '개 누락'],
@@ -1560,12 +1604,18 @@ function viewTest() {
         '<span class="grow">' + esc(row[0]) + '</span><span class="mono small">' + esc(row[2]) + '</span></div>';
     }).join('') + '</div>' +
     '<div class="row" style="margin-top:14px">' +
-    (v.perfect
-      ? '<button class="btn accent" data-act="record">' + (t.idx != null ? '복습 완료 처리' : '판정 반영') + '</button>' +
-        '<button class="btn" data-act="retry">다시 풀기</button>'
-      : '<button class="btn accent" data-act="retrain">깜지 ' +
-        Math.min(S.settings.trialMax, (p.trial || 1) + 1) + '회부터 다시</button>' +
-        '<button class="btn" data-act="record">기록만 남기고 나가기</button>') +
+    (t.guide
+      ? (v.perfect
+        ? '<button class="btn accent" data-act="to-live">이제 백지에서 써 보기</button>' +
+          '<button class="btn" data-act="retry">한 번 더 옮겨 쓰기</button>'
+        : '<button class="btn accent" data-act="retry">다시 쓰기</button>' +
+          '<button class="btn" data-act="back-to-drill">깜지 한 번 더</button>')
+      : (v.perfect
+        ? '<button class="btn accent" data-act="record">' + (t.idx != null ? '복습 완료 처리' : '판정 반영') + '</button>' +
+          '<button class="btn" data-act="retry">다시 풀기</button>'
+        : '<button class="btn accent" data-act="retrain">깜지 ' +
+          Math.min(S.settings.trialMax, (p.trial || 1) + 1) + '회부터 다시</button>' +
+          '<button class="btn" data-act="record">기록만 남기고 나가기</button>')) +
     '<span class="grow"></span><span class="small muted">현재 상태 ' + esc(m.label) + '</span></div>' +
     '</div>';
 
@@ -1792,7 +1842,12 @@ function viewSettings() {
     '처음에는 전체 1회. 실전에서 막히면 전체 1회 + 틀렸던 부분만 추가로 반복합니다. 실전을 통과하면 다시 1회로 돌아갑니다.</p>' +
     '<div class="f2"><label class="f"><span>깜지 최대 횟수</span><input type="number" id="s-tmax" min="2" max="20" value="' + st.trialMax + '"></label>' +
     '<label class="f"><span>오늘은 여기까지 — 한 문제 실패 횟수</span><input type="number" id="s-rest" min="2" max="10" value="' + st.restAfter + '"></label></div>' +
-    '<p class="small muted">2회차부터는 전체를 다시 쓰지 않고, 지난번에 틀린 줄과 그 앞뒤만 떼어 훈련합니다.</p></div>';
+    '<p class="small muted" style="margin-bottom:12px">2회차부터는 전체를 다시 쓰지 않고, 지난번에 틀린 줄과 그 앞뒤만 떼어 훈련합니다.</p>' +
+    '<label class="f"><span>깜지와 실전 사이에 설명 보고 쓰기 단계</span><select id="s-guide">' +
+    '<option value="1"' + (st.guideStep ? ' selected' : '') + '>넣기 — 한 번도 통과 못 한 문제에만</option>' +
+    '<option value="0"' + (st.guideStep ? '' : ' selected') + '>넣지 않기</option></select></label>' +
+    '<p class="small muted">코드를 보여주는 대신 줄 설명만 순서대로 보여주고 직접 적게 합니다. ' +
+    '단서를 하나씩 걷어내는 중간 단계라 암기 판정에는 넣지 않습니다.</p></div>';
 
   h += '<div class="card pad"><div class="sect-h"><h2>일일 목표</h2></div>' +
     '<label class="f"><span>신규 문제 (개)</span><input type="number" id="s-new" min="0" max="20" value="' + st.newGoal + '"></label></div>';
@@ -1899,7 +1954,7 @@ document.addEventListener('focusout', function () {
 });
 
 /* ============ editor ============ */
-function bindEditor(onSubmit) {
+function bindEditor(onSubmit, onInput) {
   var ta = $('#codeInput'), g = $('#gutter'), c = $('#counter');
   if (!ta) return null;
   var lines = -1;
@@ -1911,6 +1966,7 @@ function bindEditor(onSubmit) {
       g.textContent = out;
     }
     if (c) c.textContent = n + '줄 · ' + v.length + '자';
+    if (onInput) onInput();
   }
   ta.addEventListener('input', sync);
   ta.addEventListener('scroll', function () { g.scrollTop = ta.scrollTop; }, { passive: true });
@@ -1948,8 +2004,18 @@ function bindEditor(onSubmit) {
   return ta;
 }
 
+function markGuide() {
+  var list = document.getElementById('guideList'), ta = $('#codeInput');
+  if (!list || !ta) return;
+  var n = ta.value.split('\n').filter(function (l) { return l.trim(); }).length;
+  var idx = clamp(n, 1, list.children.length) - 1;
+  for (var i = 0; i < list.children.length; i++) {
+    list.children[i].className = i === idx ? 'on' : (i < idx ? 'done' : '');
+  }
+}
 function wireEditor() {
-  if (!bindEditor(submitTest)) return;
+  if (!bindEditor(submitTest, S.test.guide ? markGuide : null)) return;
+  if (S.test.guide) markGuide();
   var prob = S.problems.filter(function (x) { return x.id === S.test.pid; })[0];
   var lim = prob ? timeLimit(prob) : 0;
   clearInterval(S.test._timer);
@@ -1968,7 +2034,7 @@ function startTest(pid, idx, opt) {
   var p = S.problems.filter(function (x) { return x.id === pid; })[0];
   if (!p) return;
   S.test = {
-    pid: pid, idx: (idx == null ? null : idx), gate: !!opt.gate,
+    pid: pid, idx: (idx == null ? null : idx), gate: !!opt.gate, guide: !!opt.guide,
     round: (idx != null && p.schedule && p.schedule[idx]) ? p.schedule[idx].round : '연습',
     start: Date.now(), result: null, elapsed: 0, _timer: null
   };
@@ -2124,9 +2190,11 @@ function finishPass() {
 
   if (goTest) {
     var pid = dr.pid, idx = dr.idx;
+    var prob = S.problems.filter(function (x) { return x.id === pid; })[0];
+    var useGuide = S.settings.guideStep && prob && !everPassed(prob);
     S.drill = null;
-    startTest(pid, idx, {});
-    toast('깜지 완료 — 이제 실전입니다');
+    startTest(pid, idx, { guide: useGuide });
+    toast(useGuide ? '깜지 완료 — 이제 설명만 보고 써 봅니다' : '깜지 완료 — 이제 실전입니다');
   } else {
     if (nextPhase !== dr.phase) {
       dr.phase = 'block';
@@ -2184,6 +2252,20 @@ function submitTest() {
 function finishTest(retrain) {
   var t = S.test; if (!t || !t.result) return;
   var p = S.problems.filter(function (x) { return x.id === t.pid; })[0]; if (!p) return;
+  if (t.guide) {
+    /* 설명을 보고 쓴 단계다. 기록만 남기고 연속·깜지 횟수는 건드리지 않는다. */
+    var ga = (p.attempts || []).concat([{
+      at: today(), rate: t.result.rate, sec: t.elapsed, perfect: t.verdict.perfect,
+      guide: true, tags: t.result.tags.slice(0, 6), miss: []
+    }]).slice(-40);
+    var gidx2 = t.idx;
+    put('problems', S.problems, Object.assign({}, p, { attempts: ga })).then(function () {
+      S.test = null;
+      if (retrain) { startTest(p.id, gidx2, {}); toast('이번엔 아무것도 없이 써 봅니다'); return; }
+      back();
+    });
+    return;
+  }
   var T = today(), perfect = t.verdict.perfect, need = S.settings.streakNeed;
 
   var streak = perfect ? (p.streak || 0) + 1 : 0;
@@ -2399,6 +2481,18 @@ document.addEventListener('click', function (e) {
   if (a === 'retry') { startTest(S.test.pid, S.test.idx, { gate: S.test.gate }); return; }
   if (a === 'record') { finishTest(false); return; }
   if (a === 'retrain') { finishTest(true); return; }
+  if (a === 'to-live') { finishTest(true); return; }
+  if (a === 'back-to-drill') {
+    var bp = S.problems.filter(function (x) { return x.id === S.test.pid; })[0];
+    var bidx = S.test.idx;
+    finishTest(false);
+    if (bp) setTimeout(function () { startDrill(bp.id, bidx); }, 120);
+    return;
+  }
+  if (a === 'guide') {
+    startTest(el.dataset.p, el.dataset.i == null ? null : parseInt(el.dataset.i, 10), { guide: true });
+    return;
+  }
   if (a === 'push') {
     var p = S.problems.filter(function (x) { return x.id === el.dataset.p; })[0]; if (!p) return;
     var i = parseInt(el.dataset.i, 10), sc = (p.schedule || []).slice();
@@ -2421,7 +2515,8 @@ document.addEventListener('click', function (e) {
       gate: val('s-gate') === '1',
       trialMax: clamp(num('s-tmax', 10), 2, 20),
       grace: clamp(num('s-grace', 1), 0, 5),
-      restAfter: clamp(num('s-rest', 3), 2, 10)
+      restAfter: clamp(num('s-rest', 3), 2, 10),
+      guideStep: val('s-guide') === '1'
     });
     saveSettings().then(function () { render(); toast('설정을 저장했습니다'); });
     return;
