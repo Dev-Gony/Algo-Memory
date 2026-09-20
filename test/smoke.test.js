@@ -364,6 +364,43 @@ test('독서·인사이트는 화면에서 사라졌지만 데이터는 남는�
   assert.strictEqual(ls.insights.length, 1, '인사이트도 그대로');
 });
 
+test('첫 방문 화면이 무엇인지 설명하고 저장 위치를 밝힌다', async () => {
+  const t = open(); await t.tick();
+  const intro = t.d.querySelector('.intro');
+  assert.ok(intro, '빈 상태에서 소개 카드');
+  assert.ok(intro.textContent.includes('깜지'), '핵심 개념 설명');
+  assert.ok(intro.textContent.includes('이 브라우저에만'), '저장 위치를 밝혀야 한다');
+  assert.ok(intro.textContent.includes('로그인도 없습니다'));
+  assert.strictEqual(t.d.querySelectorAll('.introcell').length, 4);
+  assert.ok(t.d.querySelector('[data-act="seed-demo"]'), '둘러보기 버튼');
+});
+
+test('예시 데이터를 넣으면 모든 화면이 채워진다', async () => {
+  const t = open(); await t.tick();
+  t.click('[data-act="seed-demo"]'); await t.tick(250);
+  const ps = t.local().problems;
+  assert.strictEqual(ps.length, 14);
+  assert.ok(ps.some((p) => p.masteredAt && p.streak === 3), '암기 완료한 것');
+  assert.ok(ps.some((p) => p.trial > 1), '취약한 것');
+  assert.ok(ps.some((p) => p.streak > 0 && !p.masteredAt), '굳히는 중');
+  assert.ok(Object.keys(t.local().daily).length >= 10, '필사량 기록');
+
+  const tiles = t.texts('.today-strip .tile .big');
+  assert.strictEqual(tiles.length, 4);
+  assert.ok(t.d.querySelectorAll('#v-dash .qrow').length > 0, '오늘 할 일이 보여야 한다');
+  assert.ok(t.d.querySelector('#v-dash').textContent.includes('재확인'), '재확인 대상');
+
+  t.click('#nav button[data-v="stats"]'); await t.tick();
+  const stats = t.d.querySelector('#v-stats').textContent;
+  assert.ok(stats.includes('자주 틀리는'), '결함 패턴 차트');
+  assert.ok(t.d.querySelectorAll('#v-stats .chart').length >= 2, '달성 + 필사량 그래프');
+
+  t.click('#nav button[data-v="settings"]'); await t.tick();
+  assert.ok(t.d.querySelector('[data-act="clear-demo"]'), '지우는 길이 있어야 한다');
+  t.click('[data-act="clear-demo"]'); await t.tick(200);
+  assert.strictEqual(t.local().problems.length, 0);
+});
+
 (async () => {
   let failed = 0;
   for (const c of cases) {
