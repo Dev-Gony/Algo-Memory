@@ -401,6 +401,41 @@ test('예시 데이터를 넣으면 모든 화면이 채워진다', async () => 
   assert.strictEqual(t.local().problems.length, 0);
 });
 
+test('표지는 첫 방문에만 나오고 기록이 있으면 건너뛴다', async () => {
+  const t = open(); await t.tick();
+  const land = t.d.getElementById('landing');
+  assert.ok(!land.hidden, '기록이 없으면 표지가 뜬다');
+  assert.ok(land.textContent.includes('안녕하십니까'), '훅 문구');
+  assert.ok(land.textContent.includes('템플릿 70개'), '장식만이 아니라 근거가 있어야 한다');
+  assert.ok(land.textContent.includes('로그인도, 서버도 없습니다'), '저장 방식 고지');
+  assert.ok(t.d.body.classList.contains('cover'), '표지가 화면을 덮는다');
+
+  t.click('[data-act="enter"]'); await t.tick(60);
+  assert.ok(t.d.getElementById('landing').hidden, '들어가면 사라진다');
+  assert.ok(!t.d.body.classList.contains('cover'));
+  assert.strictEqual(t.local().settings.seenLanding, true, '다시 안 나오도록 기억한다');
+
+  const t2 = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
+  await t2.tick();
+  assert.ok(t2.d.getElementById('landing').hidden, '기록이 있으면 표지를 건너뛴다');
+});
+
+test('표지에서 바로 예시 데이터로 들어갈 수 있다', async () => {
+  const t = open(); await t.tick();
+  t.click('[data-act="enter-demo"]'); await t.tick(250);
+  assert.ok(t.d.getElementById('landing').hidden);
+  assert.strictEqual(t.local().problems.length, 14);
+  assert.strictEqual(t.view(), 'v-dash');
+});
+
+test('설정에서 표지를 다시 불러올 수 있다', async () => {
+  const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="settings"]'); await t.tick();
+  t.click('[data-act="show-landing"]'); await t.tick();
+  assert.ok(!t.d.getElementById('landing').hidden);
+});
+
 (async () => {
   let failed = 0;
   for (const c of cases) {
