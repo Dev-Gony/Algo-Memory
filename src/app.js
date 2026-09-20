@@ -80,7 +80,7 @@ function ordOf(p) { return (p && p.srcId != null && ORD[p.srcId] != null) ? ORD[
 var DEFAULTS = {
   intervals: [1, 3, 7, 14, 30], pass: 80, retry: true, newGoal: 1,
   streakNeed: 3, secPerLine: 10, baseSec: 30, decayDays: 30, gate: false, gateDone: '', gateSkip: 0,
-  trialMax: 10, bankSort: 'lv', drillNote: true, grace: 1, restAfter: 3
+  trialMax: 10, bankSort: 'lv', drillNote: true, grace: 1, restAfter: 3, demo: false
 };
 var S = {
   problems: [], books: [], insights: [], settings: Object.assign({}, DEFAULTS),
@@ -669,13 +669,29 @@ function viewDash() {
   }
 
   if (!S.problems.length) {
-    h += '<div class="card pad" style="margin-bottom:20px;border-color:var(--accent)">' +
-      '<h2 style="font-size:16px;margin-bottom:6px">검증된 대표 유형 ' + CATALOG.length + '개가 들어 있습니다</h2>' +
-      '<p class="small" style="color:var(--ink-2);margin-bottom:12px">' +
-      'DFS·BFS·DP·다익스트라·KMP까지 코딩테스트 단골 유형의 파이썬 뼈대를 전부 담아뒀습니다. ' +
-      '하나하나 손으로 옮겨 적을 필요 없이, 하루 몇 개씩 풀지만 고르면 망각곡선 커리큘럼이 자동으로 깔립니다.</p>' +
-      '<div class="row"><button class="btn accent" data-act="go-pack">유형 팩 열기</button>' +
-      '<button class="btn" data-act="go-bank-new">내 문제 직접 등록</button></div></div>';
+    h += '<div class="card pad intro" style="margin-bottom:20px">' +
+      '<h2 style="font-size:19px;margin-bottom:8px">코딩테스트 코드를 통째로 외우고, 정말 외웠는지 검증합니다</h2>' +
+      '<p style="color:var(--ink-2);margin-bottom:14px;line-height:1.7">' +
+      '연습지 위의 코드를 그대로 따라 쳐서 손에 넣고(<b>깜지</b>), 며칠 뒤 백지에서 다시 씁니다(<b>실전</b>). ' +
+      '막히면 다음번 깜지 횟수가 늘어납니다. 에빙하우스 망각곡선으로 1·3·7·14·30일 복습이 자동으로 잡힙니다.</p>' +
+      '<div class="introgrid">' +
+      [['검증된 템플릿 ' + CATALOG.length + '개', '전부 실제로 실행해서 통과한 파이썬 코드'],
+       ['난이도 6단계', '첫걸음부터 코테 실전까지, 배우는 순서대로'],
+       ['줄별 해설', '베끼기만 하지 않도록 한 줄씩 무슨 뜻인지'],
+       ['암기 판정', '연속 3회 완벽 재현해야 암기 완료']
+      ].map(function (x) {
+        return '<div class="introcell"><strong>' + esc(x[0]) + '</strong><span>' + esc(x[1]) + '</span></div>';
+      }).join('') + '</div>' +
+      '<div class="row" style="margin-top:16px">' +
+      '<button class="btn accent" data-act="seed-demo">예시 데이터로 둘러보기</button>' +
+      '<button class="btn" data-act="go-pack">기초 코스 시작하기</button>' +
+      '<button class="btn ghost" data-act="go-bank-new">내 문제 직접 등록</button></div>' +
+      '<div class="small muted" style="margin-top:12px">' +
+      (S.mode === 'cloud'
+        ? '기록은 계정 저장소에 저장되어 기기 간 동기화됩니다.'
+        : '기록은 <b>이 브라우저에만</b> 저장됩니다. 서버로 아무것도 보내지 않고 로그인도 없습니다. ' +
+          '브라우저 데이터를 지우면 함께 사라지니, 오래 쓰실 거면 설정에서 JSON 백업을 받아두세요.') +
+      '</div></div>';
   }
 
   var fresh = S.problems.filter(function (p) {
@@ -946,6 +962,81 @@ function viewCourseDetail() {
   }
   h += '</div>';
   return h;
+}
+
+/* 둘러보는 사람을 위한 예시 데이터.
+   며칠 써야 보이는 화면(통계·취약 문제·재확인·필사량)을 한 번에 채운다. */
+function seedDemo() {
+  var T = today();
+  var pool = CATALOG.filter(function (c) { return c.lv <= 2; }).slice(0, 14);
+  var objs = pool.map(function (c, i) {
+    var startedAgo = 13 - i;                 /* 오래된 것부터 */
+    var created = addDays(T, -startedAgo);
+    var sc = S.settings.intervals.map(function (d, r) {
+      return { round: r + 1, due: addDays(created, d), done: false };
+    });
+    var p = {
+      id: 'demo' + i, srcId: c.id, category: c.cat, title: c.title, url: '',
+      limits: c.limits, brief: c.brief, logic: c.logic, code: c.code, lang: 'python',
+      createdAt: created, schedule: sc, attempts: [], streak: 0, masteredAt: null, trial: 1
+    };
+    var profile = i % 5;                     /* 여러 상태를 섞는다 */
+    var att = [];
+    function attempt(daysAgo, rate, perfect, miss, tags) {
+      att.push({
+        at: addDays(T, -daysAgo), rate: rate, sec: 40 + (i * 7) % 90, perfect: perfect,
+        tags: tags || [], miss: miss || []
+      });
+    }
+    if (profile === 0) {                     /* 암기 완료 */
+      attempt(startedAgo - 1, 100, true); attempt(startedAgo - 3, 100, true); attempt(1, 100, true);
+      p.streak = 3; p.masteredAt = addDays(T, -1);
+      sc[0].done = true; sc[0].doneAt = addDays(T, -(startedAgo - 1)); sc[0].rate = 100;
+      sc[1].done = true; sc[1].doneAt = addDays(T, -(startedAgo - 3)); sc[1].rate = 100;
+    } else if (profile === 1) {              /* 굳히는 중 */
+      attempt(startedAgo - 1, 100, true); attempt(2, 100, true);
+      p.streak = 2;
+      sc[0].done = true; sc[0].doneAt = addDays(T, -(startedAgo - 1)); sc[0].rate = 100;
+    } else if (profile === 2) {              /* 취약 */
+      attempt(startedAgo - 1, 62, false, ['for 반복문'], [{ k: '반복문', n: 2 }]);
+      attempt(3, 74, false, ['return 반환'], [{ k: '들여쓰기', n: 1 }, { k: '로직·수식', n: 1 }]);
+      p.trial = 3; p.giveups = 1;
+      p.weak = { lines: [], at: addDays(T, -3) };
+      sc[0].done = true; sc[0].doneAt = addDays(T, -(startedAgo - 1)); sc[0].rate = 62;
+      sc[1].due = T;
+    } else if (profile === 3) {              /* 재확인 필요 */
+      attempt(startedAgo, 100, true);
+      p.streak = 3; p.masteredAt = addDays(T, -(S.settings.decayDays + 5));
+      sc[0].done = true; sc[0].doneAt = addDays(T, -startedAgo); sc[0].rate = 100;
+    } else {                                 /* 오늘 복습 예정 */
+      attempt(startedAgo - 1, 88, false, [], [{ k: '인덱싱/슬라이싱', n: 1 }]);
+      sc[0].done = true; sc[0].doneAt = addDays(T, -(startedAgo - 1)); sc[0].rate = 88;
+      sc[1].due = T;
+    }
+    p.attempts = att;
+    return p;
+  });
+
+  var daily = {};
+  for (var d = 13; d >= 0; d--) {
+    if (d % 6 === 4) continue;               /* 빠진 날도 있어야 그래프가 정직하다 */
+    var w = 18 + ((d * 13) % 34);
+    daily[addDays(T, -d)] = { w: w, c: Math.round(w * 0.86), r: 2 + (d % 3) };
+  }
+  S.daily = daily; saveDaily();
+  S.settings.demo = true; saveSettings();
+  putMany('problems', S.problems, objs);
+  goto('dash');
+  toast('예시 데이터를 넣었습니다 — 설정에서 지울 수 있습니다');
+}
+
+function clearDemo() {
+  var demo = S.problems.filter(function (p) { return String(p.id).indexOf('demo') === 0; });
+  demo.forEach(function (p) { drop('problems', S.problems, p.id); });
+  S.daily = {}; saveDaily();
+  S.settings.demo = false; saveSettings();
+  render();
+  toast(demo.length + '개의 예시 데이터를 지웠습니다');
 }
 
 function startCourse(cid) {
@@ -1360,6 +1451,10 @@ function viewDrill() {
       ? '<div class="row" style="margin-top:14px"><button class="btn accent" data-act="drill-next">다음으로</button>' +
         '<span class="small muted">다 채웠습니다</span></div>'
       : '') +
+    (window.innerWidth < 640
+      ? '<div class="hintbox warn-ko" style="margin-top:12px;border-color:var(--warn);color:var(--warn);background:var(--warn-soft)">' +
+        '깜지는 물리 키보드를 전제로 만들었습니다. 휴대폰에서는 특수문자 입력이 번거로우니 PC에서 쓰시길 권합니다.</div>'
+      : '') +
     '<p class="small muted" style="margin-top:12px">회색 글자 위로 그대로 따라 치세요. 틀린 글자는 들어가지 않습니다. ' +
     (dr.needBlock > 0
       ? '전체 1회를 쓴 뒤, 지난번에 틀린 부분만 ' + dr.needBlock + '회 더 씁니다. 같은 줄을 통째로 다시 치는 것보다 낫습니다.'
@@ -1523,6 +1618,7 @@ function viewSettings() {
     '<span class="small muted">저장 위치: ' + (S.mode === 'cloud' ? '계정 저장소 (기기 간 동기화)' : '이 브라우저') + '</span></div></div>';
 
   h += '<div class="card pad"><div class="sect-h"><h2>데이터</h2></div><div class="row">' +
+    (S.settings.demo ? '<button class="btn" data-act="clear-demo">예시 데이터 지우기</button>' : '') +
     '<button class="btn" data-act="sync-code">내장 코드 최신화</button>' +
     '<button class="btn" data-act="copy-json">JSON 백업 복사</button>' +
     (S.canImport ? '<button class="btn accent" data-act="import">로컬 기록 가져오기</button>' : '') +
@@ -2033,6 +2129,11 @@ document.addEventListener('click', function (e) {
   if (a === 'pack-add') { registerPack(); return; }
   if (a === 'go-pack') { goto('pack'); return; }
   if (a === 'go-dash') { goto('dash'); return; }
+  if (a === 'seed-demo') { seedDemo(); return; }
+  if (a === 'clear-demo') {
+    if (!confirm('예시 데이터를 모두 지웁니다. 직접 등록한 문제는 남습니다. 계속할까요?')) return;
+    clearDemo(); return;
+  }
   if (a === 'go-problem') { var pid = el.dataset.p; goto('bank'); S.sel = pid; render(); return; }
   if (a === 'go-bank-new') { S.form = { id: null }; goto('bank'); return; }
   if (a === 'form-open') { S.form = S.form ? null : { id: null }; render(); return; }
