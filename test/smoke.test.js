@@ -22,7 +22,6 @@ function problem(over) {
 test('코스 6단계가 낮은 난이도부터 나온다', async () => {
   const t = open(); await t.tick();
   t.click('#nav button[data-v="pack"]'); await t.tick();
-  const names = t.texts('.course').map((s) => s.split(' ')[1]);
   assert.strictEqual(t.d.querySelectorAll('.course').length, 6);
   assert.ok(t.texts('.course')[0].includes('기초 코스'), '첫 코스는 기초 코스');
   assert.deepStrictEqual(t.errors, []);
@@ -406,7 +405,8 @@ test('표지는 첫 방문에만 나오고 기록이 있으면 건너뛴다', as
   const land = t.d.getElementById('landing');
   assert.ok(!land.hidden, '기록이 없으면 표지가 뜬다');
   assert.ok(land.textContent.includes('안녕하십니까'), '훅 문구');
-  assert.ok(land.textContent.includes('템플릿 70개'), '장식만이 아니라 근거가 있어야 한다');
+  assert.ok(/템플릿 \d+개/.test(land.textContent), '장식만이 아니라 근거가 있어야 한다');
+  assert.ok(land.textContent.includes('SQL'), '언어 구성도 밝힌다');
   assert.ok(land.textContent.includes('로그인도, 서버도 없습니다'), '저장 방식 고지');
   assert.ok(t.d.body.classList.contains('cover'), '표지가 화면을 덮는다');
 
@@ -434,6 +434,64 @@ test('설정에서 표지를 다시 불러올 수 있다', async () => {
   t.click('#nav button[data-v="settings"]'); await t.tick();
   t.click('[data-act="show-landing"]'); await t.tick();
   assert.ok(!t.d.getElementById('landing').hidden);
+});
+
+test('코스가 파이썬과 SQL 로 나뉜다', async () => {
+  const t = open(); await t.tick();
+  t.click('#nav button[data-v="pack"]'); await t.tick();
+  const tabs = t.texts('.lvtabs .lvtab.big');
+  assert.strictEqual(tabs.length, 2, '언어 탭 두 개');
+  assert.ok(tabs[0].includes('파이썬') && tabs[0].includes('70'));
+  assert.ok(tabs[1].includes('SQL') && tabs[1].includes('35'));
+  assert.ok(t.texts('.course')[0].includes('기초 코스'), '기본은 파이썬');
+
+  t.click('[data-act="course-lang"][data-l="sql"]'); await t.tick();
+  const sqlCourses = t.texts('.course');
+  assert.strictEqual(sqlCourses.length, 6, 'SQL 코스도 6단계');
+  assert.ok(sqlCourses[0].includes('조회 기초 코스'), 'SQL 첫 코스: ' + sqlCourses[0].slice(0, 40));
+  assert.ok(sqlCourses.some((c) => c.includes('윈도우 함수 코스')));
+});
+
+test('SQL 코스를 시작하고 채점까지 된다', async () => {
+  const t = open(); await t.tick();
+  t.click('#nav button[data-v="pack"]'); await t.tick();
+  t.click('[data-act="course-lang"][data-l="sql"]'); await t.tick();
+  t.click('.course'); await t.tick();
+  assert.ok(t.d.querySelector('#v-pack').textContent.includes('SELECT'), '무엇을 배우는지');
+  t.click('[data-act="course-start"]'); await t.tick(200);
+  const ps = t.local().problems;
+  assert.strictEqual(ps.length, 8, 'SQL 첫걸음 8개');
+  assert.ok(ps.every((p) => p.lang === 'sql'), '전부 SQL 로 등록되어야 한다');
+
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  assert.ok(t.d.querySelectorAll('.walk .wrow').length >= 3, 'SQL 도 줄별 해설');
+  assert.ok(t.d.querySelector('#v-bank .detail').textContent.includes('SELECT 는 열'), 'SQL 해설 내용');
+
+  t.click('.detail [data-act="live"]'); await t.tick();
+  const target = t.local().problems.filter((p) => p.lang === 'sql')[0];
+  const ta = t.d.getElementById('codeInput');
+  ta.value = target.code; ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  t.click('[data-act="submit"]'); await t.tick();
+  assert.ok(t.d.querySelector('.verdict-card h2').textContent.includes('완벽'), '정답이면 통과');
+});
+
+test('SQL 에서 구조가 빠지면 잡아낸다', async () => {
+  const t = open(); await t.tick();
+  t.click('#nav button[data-v="pack"]'); await t.tick();
+  t.click('[data-act="course-lang"][data-l="sql"]'); await t.tick();
+  t.click('.course'); await t.tick();
+  t.click('[data-act="course-start"]'); await t.tick(200);
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="live"]'); await t.tick();
+  const target = t.local().problems.filter((p) => p.lang === 'sql')[0];
+  const ta = t.d.getElementById('codeInput');
+  ta.value = target.code.split('\n').filter((l) => !/ORDER BY/i.test(l)).join('\n');
+  ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  t.click('[data-act="submit"]'); await t.tick();
+  assert.ok(t.d.querySelector('.verdict-card h2').textContent.includes('아직'), 'ORDER BY 누락은 실패');
+  assert.ok(t.texts('.ck.no').join(' ').includes('ORDER BY'), '무엇이 빠졌는지 짚어야 한다');
 });
 
 (async () => {

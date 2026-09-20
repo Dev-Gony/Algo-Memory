@@ -14,7 +14,9 @@ const OUT = path.join(DIST, 'algo-memory.html');
 const read = (f) => fs.readFileSync(path.join(SRC, f), 'utf8');
 
 const css = read('styles.css').trim();
-const catalog = JSON.parse(read('catalog.json'));
+const pyCatalog = JSON.parse(read('catalog.json')).map((c) => Object.assign({ lang: 'python' }, c));
+const sqlCatalog = JSON.parse(read('sql-catalog.json')).map((c) => Object.assign({ lang: 'sql' }, c));
+const catalog = pyCatalog.concat(sqlCatalog);
 let js = read('app.js').trim();
 
 const marker = '/*__CATALOG__*/[]';
@@ -43,4 +45,5 @@ fs.writeFileSync(path.join(DIST, '.nojekyll'), '');
 
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 console.log('빌드 완료  ' + OUT);
-console.log('  문제 유형 ' + catalog.length + '개 · ' + kb(Buffer.byteLength(html)));
+console.log('  문제 유형 ' + catalog.length + '개 (파이썬 ' + pyCatalog.length +
+  ' · SQL ' + sqlCatalog.length + ') · ' + kb(Buffer.byteLength(html)));
