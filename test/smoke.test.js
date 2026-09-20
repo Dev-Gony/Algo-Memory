@@ -90,7 +90,7 @@ test('한글 조합 중에는 커서가 흔들리지 않고 안내가 뜬다', a
   assert.ok(t.d.getElementById('traceWarn').textContent.includes('한글 입력 상태'));
 });
 
-test('깜지를 다 채우면 실전으로 넘어간다', async () => {
+test('한 번도 통과 못 한 문제는 깜지 다음에 설명 단계가 온다', async () => {
   const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
   await t.tick();
   t.click('#nav button[data-v="bank"]'); await t.tick();
@@ -98,9 +98,56 @@ test('깜지를 다 채우면 실전으로 넘어간다', async () => {
   t.click('.detail [data-act="train"]'); await t.tick();
   await t.trace(CODE);
   assert.strictEqual(t.view(), 'v-test');
-  assert.ok(!t.d.getElementById('hintFold'), '실전에는 힌트가 없다');
-  assert.ok(t.d.querySelector('[data-act="giveup"]'), '모르겠다 버튼');
+  assert.ok(t.d.querySelector('.testhead').textContent.includes('설명 보고 쓰기'), '설명 단계');
+  assert.ok(t.d.getElementById('guideList'), '안내 목록이 있어야 한다');
+  assert.ok(!t.d.querySelector('[data-act="giveup"]'), '설명 단계에는 포기 버튼이 없다');
   assert.strictEqual(t.local().daily[today()].w, 6, '쓴 줄이 기록된다');
+});
+
+test('이미 통과한 문제는 설명 단계를 건너뛴다', async () => {
+  const passed = problem({ attempts: [{ at: today(), rate: 100, sec: 30, perfect: true, tags: [], miss: [] }] });
+  const t = open({ storage: { problems: [passed], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="train"]'); await t.tick();
+  await t.trace(CODE);
+  assert.ok(t.d.querySelector('.testhead').textContent.includes('실전') ||
+    t.d.querySelector('.testhead').textContent.includes('회차'), '바로 실전');
+  assert.ok(t.d.querySelector('[data-act="giveup"]'), '실전에는 포기 버튼이 있다');
+});
+
+test('설명 단계는 줄 순서대로 안내하고 암기 판정에 넣지 않는다', async () => {
+  const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="guide"]'); await t.tick();
+
+  const items = t.texts('#guideList li');
+  assert.strictEqual(items.length, 6, '코드 줄 수만큼');
+  assert.ok(items[0].includes('상자'), '첫 줄 설명: ' + items[0]);
+  assert.ok(!t.d.getElementById('guideList').textContent.includes('name = '), '코드를 보여주면 안 된다');
+
+  const ta = t.d.getElementById('codeInput');
+  ta.value = CODE.split('\n').slice(0, 3).join('\n');
+  ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  const lis = t.d.querySelectorAll('#guideList li');
+  assert.strictEqual(lis[2].className, 'on', '쓰는 줄이 따라와야 한다');
+  assert.strictEqual(lis[0].className, 'done');
+
+  ta.value = CODE; ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  t.click('[data-act="submit"]'); await t.tick();
+  assert.ok(t.d.querySelector('.verdict-card h2').textContent.includes('설명대로 옮겼습니다'));
+  assert.ok(t.d.querySelector('[data-act="to-live"]'), '다음은 백지');
+
+  t.click('[data-act="to-live"]'); await t.tick(80);
+  const p = t.local().problems[0];
+  assert.strictEqual(p.streak, 0, '연속 기록을 건드리면 안 된다');
+  assert.strictEqual(p.masteredAt, null);
+  assert.ok(p.attempts.some((a) => a.guide), '기록에는 남는다');
+  assert.ok(t.d.querySelector('.testhead').textContent.includes('실전'), '이어서 백지 실전');
+  assert.ok(!t.d.getElementById('guideList'), '실전에는 안내가 없다');
 });
 
 test('실전에 실패하면 깜지 횟수가 올라간다', async () => {
@@ -143,8 +190,9 @@ test('계정 저장소의 옛 한글 코드가 자동 교체된다', async () =>
 });
 
 test('저장소가 완전히 고장나도 학습은 멈추지 않는다', async () => {
-  const db = makeFakeDb({ collections: { problems: { p1: problem({ trial: 3 }) } } },
-    { failAll: true, throwSync: true });
+  const db = makeFakeDb({ collections: { problems: { p1: problem({
+    trial: 3, attempts: [{ at: today(), rate: 100, sec: 20, perfect: true, tags: [], miss: [] }]
+  }) } } }, { failAll: true, throwSync: true });
   const t = open({ db }); await t.tick(300);
   t.click('#nav button[data-v="bank"]'); await t.tick();
   t.click('.prow'); await t.tick();
