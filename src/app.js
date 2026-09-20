@@ -80,14 +80,14 @@ function ordOf(p) { return (p && p.srcId != null && ORD[p.srcId] != null) ? ORD[
 var DEFAULTS = {
   intervals: [1, 3, 7, 14, 30], pass: 80, retry: true, newGoal: 1,
   streakNeed: 3, secPerLine: 10, baseSec: 30, decayDays: 30, gate: false, gateDone: '', gateSkip: 0,
-  trialMax: 10, bankSort: 'lv', drillNote: true, grace: 1, restAfter: 3, demo: false
+  trialMax: 10, bankSort: 'lv', drillNote: true, grace: 1, restAfter: 3, demo: false, seenLanding: false
 };
 var S = {
   problems: [], books: [], insights: [], settings: Object.assign({}, DEFAULTS),
   view: 'dash', form: null, sel: null,
   filter: { q: '', cat: '', lv: '' }, test: null, pending: false, mode: 'local', canImport: false,
   packSel: {}, packPerDay: 2, packLv: 1,
-  drill: null, daily: {}, courseSel: null, hist: [], restCard: null,
+  drill: null, daily: {}, courseSel: null, hist: [], restCard: null, landingForced: false,
   detailTab: 'note', explainOpen: null, explainShown: null
 };
 
@@ -588,6 +588,55 @@ function tile(lab, big, unit, note, pct, cls) {
     '<div class="big">' + big + (unit ? '<em>' + esc(unit) + '</em>' : '') + '</div>' +
     (note ? '<div class="note">' + esc(note) + '</div>' : '') +
     '<div class="bar ' + (cls || '') + '"><i style="width:' + clamp(pct, 0, 100) + '%"></i></div></div>';
+}
+
+/* 표지. 기록이 하나라도 있으면 다시 나오지 않는다 — 매일 여는 사람에게는 마찰일 뿐이다. */
+function showLanding() {
+  if (S.landingForced) return true;
+  return !S.problems.length && !S.settings.seenLanding;
+}
+var LANDING_CODE = [
+  'from collections import deque',
+  '',
+  'def bfs(grid):',
+  '    n, m = len(grid), len(grid[0])',
+  '    dist = [[0] * m for _ in range(n)]',
+  '    q = deque([(0, 0)])',
+  '    dist[0][0] = 1',
+  '    while q:',
+  '        r, c = q.popleft()',
+  '        for dr, dc in ((-1,0),(1,0),(0,-1),(0,1)):',
+  '            nr, nc = r + dr, c + dc',
+  '            if 0 <= nr < n and 0 <= nc < m:',
+  '                dist[nr][nc] = dist[r][c] + 1'
+];
+function renderLanding() {
+  var el = document.getElementById('landing');
+  if (!el) return;
+  if (!showLanding()) { el.hidden = true; el.innerHTML = ''; document.body.classList.remove('cover'); return; }
+  el.hidden = false;
+  document.body.classList.add('cover');
+  el.innerHTML =
+    '<div class="lwrap">' +
+    '<div class="lbrand"><span class="dot"></span>Algo-Memory<small>EBBINGHAUS DRILL</small></div>' +
+    '<h1 class="lhead">당신의 코딩 기억은<br><em>안녕하십니까?</em></h1>' +
+    '<p class="lsub">한 달 전에 통과했던 그 코드, 지금 빈 화면에 다시 쓸 수 있습니까.<br>' +
+    '푸는 것과 기억하는 것은 다른 일입니다.</p>' +
+    '<div class="lfade"><pre class="lcode">' +
+    LANDING_CODE.map(function (l) { return l ? hl(l) : ' '; }).join('\n') +
+    '</pre><span class="lday">30일 뒤</span></div>' +
+    '<div class="lbtns">' +
+    '<button class="btn accent" data-act="enter">들어가기</button>' +
+    '<button class="btn" data-act="enter-demo">예시 데이터로 둘러보기</button>' +
+    '</div>' +
+    '<div class="lproof">' +
+    ['실행 검증을 통과한 파이썬 템플릿 ' + CATALOG.length + '개',
+     '난이도 6단계 · 첫걸음부터 코테 실전까지',
+     '줄별 해설 256줄',
+     '종단 테스트 24개'].map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') +
+    '</div>' +
+    '<p class="lnote">기록은 이 브라우저에만 남습니다. 로그인도, 서버도 없습니다.</p>' +
+    '</div>';
 }
 
 function viewDash() {
@@ -1618,6 +1667,7 @@ function viewSettings() {
     '<span class="small muted">저장 위치: ' + (S.mode === 'cloud' ? '계정 저장소 (기기 간 동기화)' : '이 브라우저') + '</span></div></div>';
 
   h += '<div class="card pad"><div class="sect-h"><h2>데이터</h2></div><div class="row">' +
+    '<button class="btn" data-act="show-landing">표지 다시 보기</button>' +
     (S.settings.demo ? '<button class="btn" data-act="clear-demo">예시 데이터 지우기</button>' : '') +
     '<button class="btn" data-act="sync-code">내장 코드 최신화</button>' +
     '<button class="btn" data-act="copy-json">JSON 백업 복사</button>' +
@@ -1631,6 +1681,7 @@ function viewSettings() {
 /* ============ render ============ */
 var VIEWS = { dash: viewDash, pack: viewPack, bank: viewBank, test: viewTest, drill: viewDrill, stats: viewStats, settings: viewSettings };
 function render() {
+  renderLanding();
   if (S.view !== 'test' && S.view !== 'drill' && gateProblem()) S.view = 'dash';
   document.body.classList.toggle('gated', !!gateProblem() && S.view !== 'test' && S.view !== 'drill');
   Object.keys(VIEWS).forEach(function (k) {
@@ -2130,6 +2181,15 @@ document.addEventListener('click', function (e) {
   if (a === 'go-pack') { goto('pack'); return; }
   if (a === 'go-dash') { goto('dash'); return; }
   if (a === 'seed-demo') { seedDemo(); return; }
+  if (a === 'enter') {
+    S.landingForced = false; S.settings.seenLanding = true; saveSettings();
+    render(); toTop(); return;
+  }
+  if (a === 'enter-demo') {
+    S.landingForced = false; S.settings.seenLanding = true; saveSettings();
+    seedDemo(); return;
+  }
+  if (a === 'show-landing') { S.landingForced = true; render(); toTop(); return; }
   if (a === 'clear-demo') {
     if (!confirm('예시 데이터를 모두 지웁니다. 직접 등록한 문제는 남습니다. 계속할까요?')) return;
     clearDemo(); return;
