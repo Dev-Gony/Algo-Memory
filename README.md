@@ -38,7 +38,7 @@
 
 **연속 3회** 완벽하면 `암기 완료`. 30일이 지나면 자동으로 `재확인 필요`로 내려온다.
 
-## 난이도 6단계 · 내장 템플릿 70개
+## 두 언어 · 각 6단계 · 내장 템플릿 105개
 
 | 단계 | 개수 | 내용 |
 | --- | --- | --- |
@@ -49,9 +49,25 @@
 | 고급 | 16 | 다익스트라, 플로이드, 위상정렬, MST, LIS, LCS, KMP, 비트마스크 DP |
 | 코테 실전 | 5 | 빠른 입출력, 상태 추가 BFS, 경로 복원, 좌표 압축, 방향 시뮬레이션 |
 
-**70개 전부 실제로 실행해서 검증한 코드다.** 틀린 코드를 다섯 번 반복 암기하면 최악이므로
+### 파이썬 70개
+
+### SQL 35개 (MySQL 기준)
+
+| 단계 | 개수 | 내용 |
+| --- | --- | --- |
+| 첫걸음 | 8 | SELECT·WHERE·ORDER BY·LIMIT·별칭·NULL·LIKE·DISTINCT |
+| 입문 | 6 | COUNT·SUM·AVG, GROUP BY, HAVING, CASE, 조건부 집계 |
+| 초보 | 6 | INNER·LEFT JOIN, 조인 후 집계, 날짜·문자열 함수, IN |
+| 중급 | 6 | WHERE·IN·EXISTS·FROM 서브쿼리, 셀프 조인, UNION |
+| 고급 | 5 | RANK·ROW_NUMBER·PARTITION BY, 누적합, LAG, CTE |
+| 코테 실전 | 4 | 그룹별 상위 N, 조건부 집계 피벗, 없는 것 찾기, 각자의 최신 기록 |
+
+**105개 전부 실제로 실행해서 검증한 코드다.**
+파이썬은 함수를 호출해 결과를 대조하고, SQL 은 sqlite3 에 스키마와 데이터를 심어
+질의를 실제로 돌린 뒤 결과 행을 대조한다. 틀린 코드를 다섯 번 반복 암기하면 최악이므로
 `content/` 의 파이썬 소스에 각 템플릿마다 단위 테스트가 붙어 있고, CI에서 매번 돌린다.
 코드는 전부 ASCII다 — 깜지 도중 한/영 전환을 강요하지 않기 위해서다.
+SQL 은 MySQL 문법으로 외우고, SQLite 에서 안 돌아가는 방언만 검증용 변환본을 따로 둔다.
 
 ## 이해 단계
 
@@ -84,7 +100,7 @@ npm install
 npm run build     # src/ → dist/algo-memory.html (단일 파일)
 npm test          # 빌드 + jsdom 종단 테스트
 npm run serve     # http://localhost:8080
-npm run catalog   # 템플릿 70개 재검증 후 catalog.json 재생성
+npm run catalog   # 템플릿 105개 재검증 후 카탈로그 재생성
 ```
 
 ### 구조

@@ -36,42 +36,83 @@ function num(id, dflt) { var v = parseInt(val(id), 10); return isNaN(v) ? (dflt 
 
 var CATS = ['구현', '완전탐색', 'DFS', 'BFS', '백트래킹', '이분탐색', '투포인터', '정렬', '그리디',
   'DP', '그래프', '최단경로', '최소신장트리', '분리집합', '문자열', '자료구조', '수학', '비트마스킹', '트리', '우선순위큐'];
-var LANGS = ['python', 'java', 'cpp', 'javascript', 'kotlin'];
-var LANG_LABEL = { python: 'Python', java: 'Java', cpp: 'C++', javascript: 'JavaScript', kotlin: 'Kotlin' };
+var LANGS = ['python', 'sql', 'java', 'cpp', 'javascript', 'kotlin'];
+var LANG_LABEL = { python: 'Python', sql: 'SQL', java: 'Java', cpp: 'C++', javascript: 'JavaScript', kotlin: 'Kotlin' };
 
 /* ============ state ============ */
 var CATALOG = /*__CATALOG__*/[];
 
-var LEVELS = [
-  { n: 1, name: '첫걸음', sub: '코딩 시작', desc: '변수·if·for·리스트·딕셔너리처럼 모든 코드의 바닥이 되는 문법. 한 편이 5~10줄이라 오늘 하나는 확실히 끝낼 수 있습니다. 여기가 헐거우면 위 단계는 아무리 봐도 안 붙습니다.' },
-  { n: 2, name: '입문', sub: 'Lv1 준비', desc: '리스트 컴프리헨션, enumerate·zip, 2차원 배열, 정렬 기본. 문법은 아는데 손이 안 따라갈 때 그 간격을 메우는 단계입니다.' },
-  { n: 3, name: '초보', sub: 'Lv1 통과선', desc: '해시·누적합·그리디·슬라이딩 윈도우·약수와 소수·빠른 입력. Lv1을 안정적으로 통과하는 데 필요한 최소 도구함.' },
-  { n: 4, name: '중급', sub: 'Lv2 핵심', desc: 'BFS·DFS·스택·조합과 순열 재귀·기본 DP·이분탐색. Lv1과 Lv2를 가르는 지점이 정확히 여기입니다.' },
-  { n: 5, name: '고급', sub: 'Lv3 이상', desc: '다익스트라·위상정렬·MST·LIS·KMP·비트마스크 DP. 대회형 문제와 상위권 기업 코테 구간.' },
-  { n: 6, name: '코테 실전', sub: '시험장 패턴', desc: '빠른 입출력·상태 추가 BFS·경로 복원·좌표 압축. 유형 하나가 아니라 시험장에서 바로 꺼내 쓰는 복합 패턴.' }
+var LANGS_USED = [
+  { id: 'python', name: '파이썬', sub: '코딩테스트 알고리즘' },
+  { id: 'sql', name: 'SQL', sub: 'MySQL 기준' }
 ];
+var LEVELS_BY_LANG = {
+  python: [
+    { n: 1, name: '첫걸음', sub: '코딩 시작', desc: '변수·if·for·리스트·딕셔너리처럼 모든 코드의 바닥이 되는 문법. 한 편이 5~10줄이라 오늘 하나는 확실히 끝낼 수 있습니다.' },
+    { n: 2, name: '입문', sub: 'Lv1 준비', desc: '리스트 컴프리헨션, enumerate·zip, 2차원 배열, 정렬 기본. 문법은 아는데 손이 안 따라갈 때 그 간격을 메웁니다.' },
+    { n: 3, name: '초보', sub: 'Lv1 통과선', desc: '해시·누적합·그리디·슬라이딩 윈도우·약수와 소수·빠른 입력. Lv1을 안정적으로 통과하는 최소 도구함.' },
+    { n: 4, name: '중급', sub: 'Lv2 핵심', desc: 'BFS·DFS·스택·조합과 순열 재귀·기본 DP·이분탐색. Lv1과 Lv2를 가르는 지점이 정확히 여기입니다.' },
+    { n: 5, name: '고급', sub: 'Lv3 이상', desc: '다익스트라·위상정렬·MST·LIS·KMP·비트마스크 DP.' },
+    { n: 6, name: '코테 실전', sub: '시험장 패턴', desc: '빠른 입출력·상태 추가 BFS·경로 복원·좌표 압축.' }
+  ],
+  sql: [
+    { n: 1, name: '첫걸음', sub: '조회의 기본', desc: 'SELECT·WHERE·ORDER BY·LIMIT·별칭·NULL·LIKE. 한 편이 3~5줄이라 하루에 두세 개는 무리 없이 끝납니다.' },
+    { n: 2, name: '입문', sub: '집계', desc: 'COUNT·SUM·AVG, GROUP BY 와 HAVING, CASE 조건 분기, 조건부 집계. SQL 문제의 절반이 여기 걸려 있습니다.' },
+    { n: 3, name: '초보', sub: 'JOIN', desc: 'INNER·LEFT JOIN, 조인 후 집계, 날짜와 문자열 함수. 표가 두 개 이상 나오면 여기가 필요합니다.' },
+    { n: 4, name: '중급', sub: '서브쿼리', desc: 'WHERE·IN·EXISTS·FROM 서브쿼리, 셀프 조인, UNION. 한 번에 안 되는 계산을 나눠 쓰는 단계.' },
+    { n: 5, name: '고급', sub: '윈도우 함수', desc: 'RANK·ROW_NUMBER·PARTITION BY, 누적합, LAG/LEAD, CTE(WITH). MySQL 8.0 이상.' },
+    { n: 6, name: '코테 실전', sub: '복합 유형', desc: '그룹별 상위 N개, 조건부 집계 피벗, 없는 것 찾기, 각자의 최신 기록. 실제 출제 형태 그대로.' }
+  ]
+};
+var LEVELS = LEVELS_BY_LANG.python;
+function levelsOf(lang) { return LEVELS_BY_LANG[lang] || LEVELS_BY_LANG.python; }
+function levelName(lang, n) {
+  var L = levelsOf(lang)[n - 1];
+  return L ? L.name : '직접 등록';
+}
+
 
 
 var COURSES = [
-  { id: 'c1', lv: 1, name: '기초 코스', sub: '파이썬을 손에 붙인다', pace: 2, need: '',
+  { id: 'c1', lang: 'python', lv: 1, name: '기초 코스', sub: '파이썬을 손에 붙인다', pace: 2, need: '',
     goal: '변수·조건문·반복문·리스트·딕셔너리를 아무것도 안 보고 쓸 수 있게 됩니다.',
     after: '프로그래머스 Lv0 문제를 읽고 바로 코드로 옮길 수 있습니다. 문법이 막혀서 멈추는 일이 사라집니다.' },
-  { id: 'c2', lv: 2, name: '입문 코스', sub: 'Lv1을 풀 준비', pace: 2, need: '기초 코스',
+  { id: 'c2', lang: 'python', lv: 2, name: '입문 코스', sub: 'Lv1을 풀 준비', pace: 2, need: '기초 코스',
     goal: '리스트 컴프리헨션, enumerate·zip, 2차원 배열, 정렬 키를 손에 붙입니다.',
     after: '문법은 아는데 손이 안 따라가던 구간이 메워집니다. Lv1 문제를 읽고 30분 안에 접근법이 잡힙니다.' },
-  { id: 'c3', lv: 3, name: 'Lv1 통과 코스', sub: '도구함 채우기', pace: 2, need: '입문 코스',
+  { id: 'c3', lang: 'python', lv: 3, name: 'Lv1 통과 코스', sub: '도구함 채우기', pace: 2, need: '입문 코스',
     goal: '해시·누적합·그리디·슬라이딩 윈도우·약수와 소수·빠른 입력을 익힙니다.',
     after: '프로그래머스 Lv1을 안정적으로 통과합니다. 시간 초과가 왜 나는지 감이 잡히기 시작합니다.' },
-  { id: 'c4', lv: 4, name: 'Lv2 돌파 코스', sub: 'Lv1과 Lv2의 경계', pace: 2, need: 'Lv1 통과 코스',
+  { id: 'c4', lang: 'python', lv: 4, name: 'Lv2 돌파 코스', sub: 'Lv1과 Lv2의 경계', pace: 2, need: 'Lv1 통과 코스',
     goal: 'BFS·DFS·스택·조합과 순열 재귀·기본 DP·이분탐색을 통째로 외웁니다.',
     after: 'Lv2 문제를 보고 어떤 유형인지 바로 분류하고, 뼈대를 먼저 깔고 시작할 수 있습니다.' },
-  { id: 'c5', lv: 5, name: '고급 코스', sub: 'Lv3 이상', pace: 1, need: 'Lv2 돌파 코스',
+  { id: 'c5', lang: 'python', lv: 5, name: '고급 코스', sub: 'Lv3 이상', pace: 1, need: 'Lv2 돌파 코스',
     goal: '다익스트라·위상정렬·MST·LIS·LCS·KMP·비트마스크 DP.',
     after: '대회형 문제와 상위권 기업 코테의 중상 난이도까지 손이 닿습니다.' },
-  { id: 'c6', lv: 6, name: '코테 실전 코스', sub: '시험장 패턴', pace: 1, need: 'Lv2 돌파 코스',
+  { id: 'c6', lang: 'python', lv: 6, name: '코테 실전 코스', sub: '시험장 패턴', pace: 1, need: 'Lv2 돌파 코스',
     goal: '빠른 입출력, 상태 추가 BFS, 경로 복원, 좌표 압축, 방향 시뮬레이션.',
-    after: '유형 하나가 아니라 여러 개가 겹친 실전 문제에서 조합해 쓸 수 있습니다.' }
+    after: '유형 하나가 아니라 여러 개가 겹친 실전 문제에서 조합해 쓸 수 있습니다.' },
+
+  { id: 's1', lang: 'sql', lv: 1, name: '조회 기초 코스', sub: '표에서 원하는 것 꺼내기', pace: 3, need: '',
+    goal: 'SELECT·WHERE·ORDER BY·LIMIT·별칭·NULL·LIKE·DISTINCT 를 보지 않고 씁니다.',
+    after: '프로그래머스 SQL Lv1 의 단일 테이블 조회 문제를 막힘없이 풉니다. 쿼리의 골격이 손에 들어옵니다.' },
+  { id: 's2', lang: 'sql', lv: 2, name: '집계 코스', sub: 'SQL 문제의 절반', pace: 2, need: '조회 기초 코스',
+    goal: 'COUNT·SUM·AVG, GROUP BY 와 HAVING, CASE 분기, 조건부 집계.',
+    after: '"~별 집계" 라는 말이 나오는 문제를 바로 GROUP BY 로 옮깁니다. WHERE 와 HAVING 을 헷갈리지 않습니다.' },
+  { id: 's3', lang: 'sql', lv: 3, name: 'JOIN 코스', sub: '표가 둘 이상일 때', pace: 2, need: '집계 코스',
+    goal: 'INNER JOIN, LEFT JOIN, 조인 후 집계, 날짜와 문자열 함수.',
+    after: '표가 세 개 나와도 당황하지 않습니다. "주문이 없는 회원" 같은 문제가 풀립니다.' },
+  { id: 's4', lang: 'sql', lv: 4, name: '서브쿼리 코스', sub: '계산을 나눠 쓰기', pace: 2, need: 'JOIN 코스',
+    goal: 'WHERE·IN·EXISTS·FROM 서브쿼리, 셀프 조인, UNION.',
+    after: '한 번에 안 되는 2단계 계산을 나눠 쓸 수 있습니다. Lv2~3 구간이 열립니다.' },
+  { id: 's5', lang: 'sql', lv: 5, name: '윈도우 함수 코스', sub: '행을 잃지 않는 집계', pace: 1, need: '서브쿼리 코스',
+    goal: 'RANK·ROW_NUMBER·PARTITION BY, 누적합, LAG/LEAD, CTE(WITH).',
+    after: '순위 문제를 공식처럼 풉니다. 실무 리포트 쿼리를 읽을 수 있게 됩니다.' },
+  { id: 's6', lang: 'sql', lv: 6, name: 'SQL 실전 코스', sub: '복합 유형', pace: 1, need: '윈도우 함수 코스',
+    goal: '그룹별 상위 N개, 조건부 집계 피벗, 없는 것 찾기, 각자의 최신 기록.',
+    after: '코딩테스트 SQL 고득점 구간의 출제 형태를 그대로 손에 넣습니다.' }
 ];
+
 
 var ORD = {};
 CATALOG.forEach(function (c, i) { ORD[c.id] = i; });
@@ -85,8 +126,8 @@ var DEFAULTS = {
 var S = {
   problems: [], books: [], insights: [], settings: Object.assign({}, DEFAULTS),
   view: 'dash', form: null, sel: null,
-  filter: { q: '', cat: '', lv: '' }, test: null, pending: false, mode: 'local', canImport: false,
-  packSel: {}, packPerDay: 2, packLv: 1,
+  filter: { q: '', cat: '', lv: '', lang: '' }, test: null, pending: false, mode: 'local', canImport: false,
+  packSel: {}, packPerDay: 2, packLv: 1, courseLang: 'python',
   drill: null, daily: {}, courseSel: null, hist: [], restCard: null, landingForced: false,
   detailTab: 'note', explainOpen: null, explainShown: null
 };
@@ -241,23 +282,24 @@ function stripBlocks(code, lang) {
   if (lang === 'python') return code.replace(/"""[\s\S]*?"""/g, '').replace(/'''[\s\S]*?'''/g, '');
   return code.replace(/\/\*[\s\S]*?\*\//g, '');
 }
-function stripLine(line, hash) {
+function stripLine(line, mode) {
   var q = null;
   for (var i = 0; i < line.length; i++) {
     var c = line[i];
     if (q) { if (c === '\\') { i++; continue; } if (c === q) q = null; continue; }
     if (c === '"' || c === "'") { q = c; continue; }
-    if (hash && c === '#') return line.slice(0, i);
-    if (!hash && c === '/' && line[i + 1] === '/') return line.slice(0, i);
+    if (mode === 'py' && c === '#') return line.slice(0, i);
+    if (mode === 'sql' && c === '-' && line[i + 1] === '-') return line.slice(0, i);
+    if (mode === 'c' && c === '/' && line[i + 1] === '/') return line.slice(0, i);
   }
   return line;
 }
 function normalize(code, lang) {
-  var hash = (lang === 'python');
+  var mode = lang === 'python' ? 'py' : (lang === 'sql' ? 'sql' : 'c');
   var src = stripBlocks(String(code || ''), lang).replace(/\r\n?/g, '\n');
   var out = [];
   src.split('\n').forEach(function (raw) {
-    var s = stripLine(raw, hash);
+    var s = stripLine(raw, mode);
     var lead = (s.match(/^[\t ]*/) || [''])[0].replace(/\t/g, '    ');
     var body = s.trim().replace(/[ \t]+/g, ' ');
     if (!body) return;
@@ -332,6 +374,52 @@ function features(lines) {
   }
   return f;
 }
+function featuresSql(lines) {
+  var f = {};
+  function bump(k) { f[k] = (f[k] || 0) + 1; }
+  var all = lines.map(function (l) { return l.text; }).join('\n');
+  var U = all.toUpperCase();
+  function cnt(re) { return (U.match(re) || []).length; }
+  if (cnt(/\bSELECT\b/g)) bump('SELECT');
+  if (cnt(/\bFROM\b/g)) bump('FROM');
+  if (cnt(/\bWHERE\b/g)) bump('WHERE 조건');
+  if (cnt(/\bGROUP\s+BY\b/g)) bump('GROUP BY');
+  if (cnt(/\bHAVING\b/g)) bump('HAVING');
+  if (cnt(/\bORDER\s+BY\b/g)) bump('ORDER BY');
+  if (cnt(/\bLIMIT\b/g)) bump('LIMIT');
+  if (cnt(/\bDISTINCT\b/g)) bump('DISTINCT');
+  var j = cnt(/\bJOIN\b/g); if (j) { f['JOIN'] = j; }
+  if (cnt(/\bLEFT\s+JOIN\b/g)) bump('LEFT JOIN');
+  var on = cnt(/\bON\b/g); if (on) { f['ON 연결 조건'] = on; }
+  if (cnt(/\bCASE\b/g)) bump('CASE 분기');
+  var wh = cnt(/\bWHEN\b/g); if (wh) { f['WHEN 조건'] = wh; }
+  if (cnt(/\bEND\b/g)) bump('END');
+  if (cnt(/\bOVER\s*\(/g)) bump('윈도우 함수(OVER)');
+  if (cnt(/\bPARTITION\s+BY\b/g)) bump('PARTITION BY');
+  if (cnt(/\bWITH\b/g)) bump('CTE(WITH)');
+  if (cnt(/\bUNION\b/g)) bump('UNION');
+  if (cnt(/\bEXISTS\b/g)) bump('EXISTS');
+  if (cnt(/\bIS\s+NULL\b/g)) bump('IS NULL');
+  if (cnt(/\bLIKE\b/g)) bump('LIKE');
+  if (cnt(/\bBETWEEN\b/g)) bump('BETWEEN');
+  var agg = cnt(/\b(COUNT|SUM|AVG|MAX|MIN)\s*\(/g); if (agg) { f['집계 함수'] = agg; }
+  var sub = (all.match(/\(\s*SELECT\b/gi) || []).length; if (sub) { f['서브쿼리'] = sub; }
+  var alias = cnt(/\bAS\b/g); if (alias) { f['AS 별칭'] = alias; }
+  return f;
+}
+function tagOfSql(t) {
+  var u = t.toUpperCase();
+  if (/^SELECT\b/.test(u)) return 'SELECT 열 목록';
+  if (/^FROM\b|^JOIN\b|^LEFT\b|^INNER\b/.test(u)) return 'FROM·JOIN';
+  if (/^ON\b/.test(u)) return 'ON 연결 조건';
+  if (/^WHERE\b|^AND\b|^OR\b/.test(u)) return 'WHERE 조건';
+  if (/^GROUP\b|^HAVING\b/.test(u)) return 'GROUP BY·HAVING';
+  if (/^ORDER\b|^LIMIT\b/.test(u)) return 'ORDER BY·LIMIT';
+  if (/^WHEN\b|^ELSE\b|^CASE\b|^END\b/.test(u)) return 'CASE 분기';
+  if (/OVER\s*\(/.test(u)) return '윈도우 함수';
+  if (/^WITH\b|^\)/.test(u)) return 'CTE 구조';
+  return '표현식';
+}
 function tagOf(t) {
   if (/^(for|while)\b/.test(t)) return '반복문';
   if (/^(if|elif|else)\b/.test(t)) return '조건 분기';
@@ -345,6 +433,7 @@ function tagOf(t) {
 }
 
 function grade(original, answer, lang) {
+  var tagFn = (lang === 'sql') ? tagOfSql : tagOf;
   var A = normalize(original, lang), B = normalize(answer, lang);
   var d = lcsDiff(A, B);
   var rate = (A.length + B.length) ? Math.round((2 * d.lcs / (A.length + B.length)) * 1000) / 10 : 0;
@@ -366,12 +455,12 @@ function grade(original, answer, lang) {
       var soft = (miss[k].text === extra[k].text) || pairSim(miss[k].text, extra[k].text) >= 0.75;
       rows.push({ k: 'miss', d: miss[k].depth, html: h[0], soft: soft });
       rows.push({ k: 'extra', d: extra[k].depth, html: h[1], soft: soft });
-      if (miss[k].text === extra[k].text) tag('들여쓰기'); else tag(tagOf(miss[k].text));
+      if (miss[k].text === extra[k].text) tag('들여쓰기'); else tag(tagFn(miss[k].text));
       if (soft) surface++; else markHard(miss[k].text);
     }
     for (k = pairs; k < miss.length; k++) {
       rows.push({ k: 'miss', d: miss[k].depth, t: miss[k].text });
-      tag(tagOf(miss[k].text)); markHard(miss[k].text);
+      tag(tagFn(miss[k].text)); markHard(miss[k].text);
     }
     for (k = pairs; k < extra.length; k++) {
       rows.push({ k: 'extra', d: extra[k].depth, t: extra[k].text });
@@ -380,7 +469,10 @@ function grade(original, answer, lang) {
   }
 
   /* structural check */
-  var fa = features(A), fb = features(B), checks = [];
+  var isSql = (lang === 'sql');
+  var fa = isSql ? featuresSql(A) : features(A);
+  var fb = isSql ? featuresSql(B) : features(B);
+  var checks = [];
   Object.keys(fa).forEach(function (k) {
     var need = fa[k], got = fb[k] || 0;
     checks.push({ k: k, need: need, got: got, ok: got >= need });
@@ -397,7 +489,31 @@ function grade(original, answer, lang) {
 /* ============ syntax highlight ============ */
 var KW = /^(def|class|return|if|elif|else|for|while|in|not|and|or|import|from|as|with|try|except|finally|lambda|yield|break|continue|pass|global|nonlocal|is|None|True|False|self|void|int|public|private|static|const|let|var|function|new|null|true|false|fun|val|struct|include|using|namespace)$/;
 var BI = /^(print|range|len|str|input|append|appendleft|popleft|sorted|sort|set|dict|list|tuple|map|sum|min|max|abs|enumerate|zip|deque|heapq|heappush|heappop|defaultdict|Counter|sys|math|bisect|reversed|any|all|divmod|pow|ord|chr|join|split|strip|add|remove|pop|copy|format)$/;
-function hl(code) {
+var SQL_KW = /^(SELECT|FROM|WHERE|GROUP|BY|HAVING|ORDER|LIMIT|OFFSET|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|ON|AS|AND|OR|NOT|IN|IS|NULL|LIKE|BETWEEN|DISTINCT|CASE|WHEN|THEN|ELSE|END|UNION|ALL|WITH|RECURSIVE|OVER|PARTITION|ASC|DESC|EXISTS|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|PRIMARY|KEY|INTEGER|TEXT)$/i;
+var SQL_FN = /^(COUNT|SUM|AVG|MAX|MIN|IFNULL|COALESCE|ROUND|ABS|SUBSTRING|SUBSTR|CHAR_LENGTH|LENGTH|CONCAT|UPPER|LOWER|TRIM|REPLACE|DATE_FORMAT|STRFTIME|YEAR|MONTH|DAY|DATEDIFF|NOW|RANK|DENSE_RANK|ROW_NUMBER|LAG|LEAD|GROUP_CONCAT|CAST)$/i;
+function hlSql(code) {
+  var src = String(code || ''), out = '', last = 0;
+  var re = /(--[^\n]*)|('(?:[^'\\]|\\.|'')*')|([A-Za-z_][\w]*)|(\b\d+\.?\d*\b)/g;
+  var m;
+  while ((m = re.exec(src))) {
+    out += esc(src.slice(last, m.index));
+    last = re.lastIndex;
+    if (m[1]) out += '<span class="t-c">' + esc(m[1]) + '</span>';
+    else if (m[2]) out += '<span class="t-s">' + esc(m[2]) + '</span>';
+    else if (m[3]) {
+      if (SQL_KW.test(m[3])) out += '<span class="t-k">' + esc(m[3]) + '</span>';
+      else if (SQL_FN.test(m[3])) out += '<span class="t-b">' + esc(m[3]) + '</span>';
+      else out += esc(m[3]);
+    } else out += '<span class="t-n">' + esc(m[4]) + '</span>';
+  }
+  out += esc(src.slice(last));
+  return out;
+}
+function hl(code, lang) {
+  if (lang === 'sql') return hlSql(code);
+  return hlPy(code);
+}
+function hlPy(code) {
   var src = String(code || ''), out = '', last = 0;
   var re = /(#[^\n]*|\/\/[^\n]*)|("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|([A-Za-z_]\w*)|(\b\d+\.?\d*\b)/g;
   var m;
@@ -630,10 +746,10 @@ function renderLanding() {
     '<button class="btn" data-act="enter-demo">예시 데이터로 둘러보기</button>' +
     '</div>' +
     '<div class="lproof">' +
-    ['실행 검증을 통과한 파이썬 템플릿 ' + CATALOG.length + '개',
-     '난이도 6단계 · 첫걸음부터 코테 실전까지',
-     '줄별 해설 256줄',
-     '종단 테스트 24개'].map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') +
+    ['실행 검증을 통과한 템플릿 ' + CATALOG.length + '개',
+     '파이썬 ' + CATALOG.filter(function (c) { return c.lang === 'python'; }).length + ' · SQL ' + CATALOG.filter(function (c) { return c.lang === 'sql'; }).length,
+     '각 언어 난이도 6단계 · 첫걸음부터 코테 실전까지',
+     '줄별 해설 · 종단 테스트 자동 실행'].map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') +
     '</div>' +
     '<p class="lnote">기록은 이 브라우저에만 남습니다. 로그인도, 서버도 없습니다.</p>' +
     '</div>';
@@ -724,8 +840,8 @@ function viewDash() {
       '연습지 위의 코드를 그대로 따라 쳐서 손에 넣고(<b>깜지</b>), 며칠 뒤 백지에서 다시 씁니다(<b>실전</b>). ' +
       '막히면 다음번 깜지 횟수가 늘어납니다. 에빙하우스 망각곡선으로 1·3·7·14·30일 복습이 자동으로 잡힙니다.</p>' +
       '<div class="introgrid">' +
-      [['검증된 템플릿 ' + CATALOG.length + '개', '전부 실제로 실행해서 통과한 파이썬 코드'],
-       ['난이도 6단계', '첫걸음부터 코테 실전까지, 배우는 순서대로'],
+      [['검증된 템플릿 ' + CATALOG.length + '개', '파이썬 ' + CATALOG.filter(function (c) { return c.lang === 'python'; }).length + '개, SQL ' + CATALOG.filter(function (c) { return c.lang === 'sql'; }).length + '개. 전부 실행해서 통과한 코드'],
+       ['언어별 난이도 6단계', '첫걸음부터 코테 실전까지, 배우는 순서대로'],
        ['줄별 해설', '베끼기만 하지 않도록 한 줄씩 무슨 뜻인지'],
        ['암기 판정', '연속 3회 완벽 재현해야 암기 완료']
       ].map(function (x) {
@@ -733,7 +849,7 @@ function viewDash() {
       }).join('') + '</div>' +
       '<div class="row" style="margin-top:16px">' +
       '<button class="btn accent" data-act="seed-demo">예시 데이터로 둘러보기</button>' +
-      '<button class="btn" data-act="go-pack">기초 코스 시작하기</button>' +
+      '<button class="btn" data-act="go-pack">코스 고르기</button>' +
       '<button class="btn ghost" data-act="go-bank-new">내 문제 직접 등록</button></div>' +
       '<div class="small muted" style="margin-top:12px">' +
       (S.mode === 'cloud'
@@ -806,7 +922,9 @@ function viewDash() {
   return h;
 }
 
-function courseItems(c) { return CATALOG.filter(function (x) { return x.lv === c.lv; }); }
+function courseItems(c) {
+  return CATALOG.filter(function (x) { return x.lv === c.lv && x.lang === c.lang; });
+}
 function bySrcMap() {
   var m = {};
   S.problems.forEach(function (p) { if (p.srcId) m[p.srcId] = p; });
@@ -845,9 +963,19 @@ function viewPack() {
   if (S.courseSel) return viewCourseDetail();
 
   var have = packRegistered();
+  var lang = S.courseLang;
   var h = '<div class="sect-h"><h2>코스</h2><span class="sub">낮은 단계부터 순서대로</span></div>';
 
-  h += '<div class="stack-g" style="margin-bottom:22px">' + COURSES.map(function (c) {
+  h += '<div class="lvtabs" style="margin-bottom:16px">' + LANGS_USED.map(function (L) {
+    var all = CATALOG.filter(function (c) { return c.lang === L.id; });
+    var got = all.filter(function (c) { return have[c.id]; }).length;
+    return '<button class="lvtab big' + (lang === L.id ? ' on' : '') + '" data-act="course-lang" data-l="' + L.id + '">' +
+      esc(L.name) + ' <span class="mono">' + got + '/' + all.length + '</span></button>';
+  }).join('') + '</div>';
+
+  h += '<div class="stack-g" style="margin-bottom:22px">' + COURSES.filter(function (c) {
+    return c.lang === lang;
+  }).map(function (c) {
     var st = courseStat(c);
     var days = Math.ceil(st.n / c.pace);
     var pct = st.n ? st.done / st.n * 100 : 0;
@@ -880,13 +1008,14 @@ function viewPack() {
 
 function packBrowser(have) {
   var sel = Object.keys(S.packSel).filter(function (k) { return S.packSel[k]; });
-  var lv = S.packLv;
-  var pool = CATALOG.filter(function (c) { return !lv || c.lv === lv; });
+  var lv = S.packLv, lang = S.courseLang;
+  var inLang = CATALOG.filter(function (c) { return c.lang === lang; });
+  var pool = inLang.filter(function (c) { return !lv || c.lv === lv; });
 
   var h = '<div class="lvtabs">' +
-    '<button class="lvtab' + (!lv ? ' on' : '') + '" data-act="pack-lv" data-l="0">전체 ' + CATALOG.length + '</button>' +
-    LEVELS.map(function (L) {
-      var all = CATALOG.filter(function (c) { return c.lv === L.n; });
+    '<button class="lvtab' + (!lv ? ' on' : '') + '" data-act="pack-lv" data-l="0">전체 ' + inLang.length + '</button>' +
+    levelsOf(lang).map(function (L) {
+      var all = inLang.filter(function (c) { return c.lv === L.n; });
       var got = all.filter(function (c) { return have[c.id]; }).length;
       return '<button class="lvtab' + (lv === L.n ? ' on' : '') + '" data-act="pack-lv" data-l="' + L.n + '">' +
         esc(L.name) + ' <span class="mono">' + got + '/' + all.length + '</span></button>';
@@ -922,7 +1051,7 @@ function packBrowser(have) {
           '<div class="small muted" style="margin-top:2px">' + esc(c.brief) + '</div>' +
           '<details class="fold" style="margin-top:4px"><summary>코드 ' + c.code.split('\n').length + '줄</summary>' +
           '<div class="hintbox" style="margin:8px 0">' + esc(c.logic) + '</div>' +
-          '<pre class="code">' + hl(c.code) + '</pre></details>' +
+          '<pre class="code">' + hl(c.code, c.lang) + '</pre></details>' +
           '</div></div></div>';
       }).join('') + '</div>';
   }).join('');
@@ -932,7 +1061,7 @@ function packBrowser(have) {
 function viewCourseDetail() {
   var c = COURSES.filter(function (x) { return x.id === S.courseSel; })[0];
   if (!c) { S.courseSel = null; return viewPack(); }
-  var L = LEVELS[c.lv - 1];
+  var L = levelsOf(c.lang)[c.lv - 1];
   var st = courseStat(c);
   var pace = clamp(S.coursePace || c.pace, 1, 5);
   var days = Math.ceil(st.n / pace);
@@ -1005,7 +1134,7 @@ function viewCourseDetail() {
           '</div>' +
           (pr ? '' : '<details class="fold" style="margin-top:6px"><summary>미리보기 — 코드와 주의점</summary>' +
             '<div class="hintbox" style="margin:8px 0">' + esc(it.logic) + '</div>' +
-            '<pre class="code">' + hl(it.code) + '</pre></details>') +
+            '<pre class="code">' + hl(it.code, it.lang) + '</pre></details>') +
           '</div></div></div>';
       }).join('') + '</div>';
   }
@@ -1026,7 +1155,7 @@ function seedDemo() {
     });
     var p = {
       id: 'demo' + i, srcId: c.id, category: c.cat, title: c.title, url: '',
-      limits: c.limits, brief: c.brief, logic: c.logic, code: c.code, lang: 'python',
+      limits: c.limits, brief: c.brief, logic: c.logic, code: c.code, lang: c.lang || 'python',
       createdAt: created, schedule: sc, attempts: [], streak: 0, masteredAt: null, trial: 1
     };
     var profile = i % 5;                     /* 여러 상태를 섞는다 */
@@ -1100,7 +1229,7 @@ function startCourse(cid) {
     var day = addDays(base, Math.floor(i / pace));
     return {
       id: uid(), srcId: it.id, category: it.cat, title: it.title, url: '',
-      limits: it.limits, brief: it.brief, logic: it.logic, code: it.code, lang: 'python',
+      limits: it.limits, brief: it.brief, logic: it.logic, code: it.code, lang: it.lang || 'python',
       createdAt: day, schedule: makeSchedule(day), attempts: [], streak: 0, masteredAt: null
     };
   });
@@ -1120,7 +1249,7 @@ function registerPack() {
     var day = addDays(base, Math.floor(i / perDay));
     return {
       id: uid(), srcId: c.id, category: c.cat, title: c.title, url: '',
-      limits: c.limits, brief: c.brief, logic: c.logic, code: c.code, lang: 'python',
+      limits: c.limits, brief: c.brief, logic: c.logic, code: c.code, lang: c.lang || 'python',
       createdAt: day, schedule: makeSchedule(day), attempts: []
     };
   });
@@ -1165,12 +1294,16 @@ function viewBank() {
   S.problems.forEach(function (p) { cats[p.category || '미분류'] = 1; });
   h += '<div class="filters">' +
     '<input type="text" id="q" placeholder="제목 검색" value="' + esc(S.filter.q) + '" data-live="q">' +
+    '<select id="qlang" data-live="lang"><option value="">전체 언어</option>' +
+    LANGS_USED.map(function (L) {
+      return '<option value="' + L.id + '"' + (S.filter.lang === L.id ? ' selected' : '') + '>' + esc(L.name) + '</option>';
+    }).join('') + '</select>' +
     '<select id="qsort" data-live="sort">' +
     [['lv', '난이도순'], ['due', '복습 임박순'], ['weak', '취약한 순'], ['recent', '최근 등록순']].map(function (o) {
       return '<option value="' + o[0] + '"' + (S.settings.bankSort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
     }).join('') + '</select>' +
     '<select id="qlv" data-live="lv"><option value="">전체 난이도</option>' +
-    LEVELS.map(function (L) {
+    levelsOf(S.filter.lang || 'python').map(function (L) {
       return '<option value="' + L.n + '"' + (S.filter.lv == L.n ? ' selected' : '') + '>' + esc(L.name) + '</option>';
     }).join('') + '</select>' +
     '<select id="qcat" data-live="cat"><option value="">전체 카테고리</option>' +
@@ -1181,6 +1314,7 @@ function viewBank() {
   var lvOf = {};
   CATALOG.forEach(function (c) { lvOf[c.id] = c.lv; });
   var list = S.problems.filter(function (p) {
+    if (S.filter.lang && (p.lang || 'python') !== S.filter.lang) return false;
     if (S.filter.lv && String(lvOf[p.srcId] || '') !== String(S.filter.lv)) return false;
     if (S.filter.cat && (p.category || '미분류') !== S.filter.cat) return false;
     if (S.filter.q && String(p.title).toLowerCase().indexOf(S.filter.q.toLowerCase()) < 0) return false;
@@ -1210,7 +1344,8 @@ function viewBank() {
       return '<div class="prow" data-act="select" data-p="' + p.id + '">' +
         '<div class="meta"><div class="ttl">' + esc(p.title) + '</div>' +
         '<div class="sub">' +
-        (lvOf[p.srcId] ? '<span class="chip mono">L' + lvOf[p.srcId] + ' ' + esc(LEVELS[lvOf[p.srcId] - 1].name) + '</span>' : '') +
+        '<span class="chip mono">' + esc((LANGS_USED.filter(function (L) { return L.id === (p.lang || 'python'); })[0] || {}).name || 'Python') + '</span>' +
+        (lvOf[p.srcId] ? '<span class="chip mono">L' + lvOf[p.srcId] + ' ' + esc(levelName(p.lang || 'python', lvOf[p.srcId])) + '</span>' : '') +
         '<span class="chip">' + esc(p.category || '미분류') + '</span>' +
         '<span class="rounds">' + sc.map(function (s) { return '<i class="' + (s.done ? 'done' : '') + '"></i>'; }).join('') + '</span>' +
         '<span class="mono">' + done + '/' + sc.length + '</span>' +
@@ -1278,12 +1413,12 @@ function detailNote(p, c) {
       '<span class="sub">한 줄씩 무슨 뜻인지</span></div>' +
       '<div class="walk">' + rows.map(function (r, i) {
         return '<div class="wrow"><div class="wn mono">' + (i + 1) + '</div>' +
-          '<div class="wc"><pre class="code" style="border:none;background:transparent;padding:0;margin:0">' + hl(r.code) + '</pre>' +
+          '<div class="wc"><pre class="code" style="border:none;background:transparent;padding:0;margin:0">' + hl(r.code, p.lang) + '</pre>' +
           (r.note ? '<div class="wt">' + esc(r.note) + '</div>' : '') + '</div></div>';
       }).join('') + '</div>';
   } else {
     h += '<details class="fold"><summary>코드 보기</summary><pre class="code" style="margin-top:8px">' +
-      hl(catalogCode(p)) + '</pre></details>';
+      hl(catalogCode(p), p.lang) + '</pre></details>';
   }
 
   h += explainBlock(p, c);
@@ -1602,8 +1737,7 @@ function viewStats() {
   if (lvKeys.length) {
     h += '<div class="card pad" style="margin-bottom:16px"><div class="sect-h"><h2>난이도별 암기 진척</h2></div><div class="hbars">' +
       lvKeys.map(function (k) {
-        var L = LEVELS[parseInt(k, 10) - 1];
-        var nm = L ? L.name : '직접 등록';
+        var nm = levelName('python', parseInt(k, 10));
         var v = byLv[k].n ? byLv[k].done / byLv[k].n * 100 : 0;
         return '<div class="hb"><span>' + esc(nm) + '</span><span class="track"><i style="width:' + v + '%"></i></span>' +
           '<span class="v">' + byLv[k].done + '/' + byLv[k].n + '</span></div>';
@@ -1733,7 +1867,7 @@ window.addEventListener('popstate', function () {
   if (HIST.depth > 0) HIST.depth--;
   doBack();
 });
-var KEEP = /^(f-|b-|i-|s-|ex-|pg-|pack-per$|c-pace$|q$|qcat$|qlv$|qsort$)/;
+var KEEP = /^(f-|b-|i-|s-|ex-|pg-|pack-per$|c-pace$|q$|qcat$|qlv$|qsort$|qlang$)/;
 /* codeInput is excluded below */
 function snapInputs() {
   var o = {};
@@ -2158,10 +2292,13 @@ document.addEventListener('click', function (e) {
     render(); toTop(); navPush(); return;
   }
   if (a === 'course-start') { startCourse(el.dataset.c); return; }
+  if (a === 'course-lang') { S.courseLang = el.dataset.l; S.packLv = 1; S.packSel = {}; render(); toTop(); return; }
   if (a === 'pack-lv') { S.packOpen = true; S.packLv = parseInt(el.dataset.l, 10) || 0; render(); return; }
   if (a === 'pack-course') {
     var want = el.dataset.lv.split(',').map(Number), have0 = packRegistered();
-    CATALOG.forEach(function (c) { if (want.indexOf(c.lv) >= 0 && !have0[c.id]) S.packSel[c.id] = true; });
+    CATALOG.forEach(function (c) {
+      if (c.lang === S.courseLang && want.indexOf(c.lv) >= 0 && !have0[c.id]) S.packSel[c.id] = true;
+    });
     render(); return;
   }
   if (a === 'pack-tog') {
@@ -2172,7 +2309,7 @@ document.addEventListener('click', function (e) {
   if (a === 'pack-all') {
     var have1 = packRegistered();
     CATALOG.forEach(function (c) {
-      if (!have1[c.id] && (!S.packLv || c.lv === S.packLv)) S.packSel[c.id] = true;
+      if (!have1[c.id] && c.lang === S.courseLang && (!S.packLv || c.lv === S.packLv)) S.packSel[c.id] = true;
     });
     render(); return;
   }
@@ -2351,6 +2488,7 @@ document.addEventListener('change', function (e) {
   var t = e.target;
   if (t.dataset && t.dataset.live === 'cat') { S.filter.cat = t.value; render(); }
   if (t.dataset && t.dataset.live === 'lv') { S.filter.lv = t.value; render(); }
+  if (t.dataset && t.dataset.live === 'lang') { S.filter.lang = t.value; S.filter.lv = ''; render(); }
   if (t.dataset && t.dataset.live === 'pace') { S.coursePace = clamp(parseInt(t.value, 10) || 2, 1, 5); }
   if (t.dataset && t.dataset.live === 'sort') { S.settings.bankSort = t.value; saveSettings(); render(); }
 });

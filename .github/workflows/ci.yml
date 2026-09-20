@@ -14,10 +14,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
-      - name: 70개 템플릿 실행
+      - name: 파이썬 템플릿 70개 실행
         run: python3 content/catalog3.py
-      - name: 생성된 catalog.json 이 커밋본과 같은지
-        run: git diff --exit-code src/catalog.json
+      - name: SQL 템플릿 35개 실행 (sqlite3 로 실제 질의)
+        run: python3 content/sql_catalog.py
+      - name: 생성된 카탈로그가 커밋본과 같은지
+        run: git diff --exit-code src/catalog.json src/sql-catalog.json
 
   app:
     name: 빌드 + 종단 테스트
