@@ -18,6 +18,8 @@ const pyCatalog = JSON.parse(read('catalog.json')).map((c) => Object.assign({ la
 const sqlCatalog = JSON.parse(read('sql-catalog.json')).map((c) => Object.assign({ lang: 'sql' }, c));
 const catalog = pyCatalog.concat(sqlCatalog);
 let js = read('app.js').trim();
+const cloudConfig = read('cloud-config.js').trim();
+const cloud = read('cloud.js').trim();
 
 const marker = '/*__CATALOG__*/[]';
 if (!js.includes(marker)) {
@@ -30,7 +32,7 @@ let html = read('index.html');
 html = html
   .replace(/<!--DEV-->[\s\S]*?<!--\/DEV-->\s*/g, '')
   .replace('<!--INJECT:STYLES-->', '<style>\n' + css + '\n</style>')
-  .replace('<!--INJECT:SCRIPT-->', '<script>\n' + js + '\n</script>');
+  .replace('<!--INJECT:SCRIPT-->', '<script>\n' + cloudConfig + '\n</script>\n<script>\n' + cloud + '\n</script>\n<script>\n' + js + '\n</script>');
 
 if (html.includes('<!--INJECT:')) {
   console.error('치환되지 않은 자리표시자가 남았습니다.');
