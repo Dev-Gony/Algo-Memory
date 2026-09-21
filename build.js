@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * src/ 의 조각들을 dist/algo-memory.html 하나로 합친다.
- * 배포 대상은 항상 이 단일 파일이다. 외부 요청은 구글 폰트뿐이고
- * 나머지 CSS·JS·문제 데이터는 전부 안에 들어간다.
+ * 배포 대상은 항상 이 단일 파일이다. 앱 CSS·JS·문제 데이터는 인라인하고,
+ * 웹 배포에서는 Google Fonts와 Supabase JS SDK를 외부에서 불러온다.
  */
 const fs = require('fs');
 const path = require('path');
