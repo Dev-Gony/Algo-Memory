@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * src/ 의 조각들을 dist/algo-memory.html 하나로 합친다.
- * 배포 대상은 항상 이 단일 파일이다. 외부 요청은 구글 폰트뿐이고
- * 나머지 CSS·JS·문제 데이터는 전부 안에 들어간다.
+ * 배포 대상은 항상 이 단일 파일이다. 앱 CSS·JS·문제 데이터는 인라인하고,
+ * 웹 배포에서는 Google Fonts와 Supabase JS SDK를 외부에서 불러온다.
  */
 const fs = require('fs');
 const path = require('path');
@@ -18,6 +18,8 @@ const pyCatalog = JSON.parse(read('catalog.json')).map((c) => Object.assign({ la
 const sqlCatalog = JSON.parse(read('sql-catalog.json')).map((c) => Object.assign({ lang: 'sql' }, c));
 const catalog = pyCatalog.concat(sqlCatalog);
 let js = read('app.js').trim();
+const cloudConfig = read('cloud-config.js').trim();
+const cloud = read('cloud.js').trim();
 
 const marker = '/*__CATALOG__*/[]';
 if (!js.includes(marker)) {
@@ -30,7 +32,7 @@ let html = read('index.html');
 html = html
   .replace(/<!--DEV-->[\s\S]*?<!--\/DEV-->\s*/g, '')
   .replace('<!--INJECT:STYLES-->', '<style>\n' + css + '\n</style>')
-  .replace('<!--INJECT:SCRIPT-->', '<script>\n' + js + '\n</script>');
+  .replace('<!--INJECT:SCRIPT-->', '<script>\n' + cloudConfig + '\n</script>\n<script>\n' + cloud + '\n</script>\n<script>\n' + js + '\n</script>');
 
 if (html.includes('<!--INJECT:')) {
   console.error('치환되지 않은 자리표시자가 남았습니다.');
