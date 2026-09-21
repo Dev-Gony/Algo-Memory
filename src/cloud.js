@@ -71,7 +71,7 @@ function field(label, id, type, auto) {
     (auto ? ' autocomplete="' + auto + '"' : '') + '></label>';
 }
 function shell(title, body) {
-  return '<div class="auth-backdrop" data-auth-close="1"><div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">' +
+  return '<div class="auth-backdrop"><div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">' +
     '<div class="auth-head"><div><div class="auth-kicker">학습 기록 동기화</div><h2 id="authTitle">' + title + '</h2></div>' +
     '<button class="iconbtn auth-close" data-auth-close="1" aria-label="닫기">×</button></div>' +
     body + '</div></div>';
@@ -108,9 +108,9 @@ function signupView() {
 }
 function verifyView(email) {
   pendingSignupEmail = email || pendingSignupEmail;
-  show(shell('이메일 인증', '<p class="small muted"><b>' + esc(pendingSignupEmail) + '</b>으로 보낸 6자리 인증번호를 입력하세요.</p>' +
-    field('인증번호','auth-code','text','one-time-code') +
-    '<div class="row"><button class="btn accent" data-auth="verify">인증하고 시작하기</button>' +
+  show(shell('이메일 인증', '<p class="auth-desc"><b>' + esc(pendingSignupEmail) + '</b>으로 보낸 인증번호를 입력하세요.</p>' +
+    '<label class="f"><span>인증번호</span><input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="인증번호 입력"></label>' +
+    '<div class="auth-actions"><button class="btn accent" data-auth="verify">인증하고 시작하기</button>' +
     '<button class="btn" data-auth="resend">인증번호 다시 보내기</button></div>'));
 }
 function resetView() {
@@ -156,7 +156,7 @@ async function act(name) {
     }
     if (name === 'verify') {
       var code=value('auth-code');
-      if (!/^\d{6}$/.test(code)) throw new Error('6자리 인증번호를 입력하세요.');
+      if (!/^\d{6,10}$/.test(code)) throw new Error('이메일로 받은 숫자 인증번호를 입력하세요.');
       var v=await client.auth.verifyOtp({email:pendingSignupEmail,token:code,type:'email'}); if(v.error) throw v.error;
       await adoptSession(v.data.session); close(); if(app&&app.toast) app.toast('가입이 완료됐습니다. 기존 학습 기록을 저장했습니다'); return;
     }
@@ -209,8 +209,8 @@ async function init() {
 }
 
 document.addEventListener('click', function (e) {
-  var closeBtn=e.target.closest('[data-auth-close]');
-  if (closeBtn && (e.target === closeBtn || closeBtn.tagName === 'BUTTON')) { close(); return; }
+  var closeBtn=e.target.closest('button[data-auth-close]');
+  if (closeBtn) { close(); return; }
   if (e.target.closest('#accountBtn')) { loginView(); return; }
   var el=e.target.closest('[data-auth]'); if(!el) return;
   var a=el.dataset.auth;
