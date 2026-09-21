@@ -119,6 +119,12 @@ function resetView() {
     '<div class="row"><button class="btn accent" data-auth="reset">재설정 메일 보내기</button>' +
     '<button class="btn" data-auth="login-view">로그인으로</button></div>'));
 }
+function updatePasswordView() {
+  show(shell('새 비밀번호 설정', '<p class="small muted">새 비밀번호를 입력하면 바로 변경됩니다.</p>' +
+    field('새 비밀번호','auth-password','password','new-password') +
+    field('새 비밀번호 확인','auth-password2','password','new-password') +
+    '<div class="row"><button class="btn accent" data-auth="update-password">비밀번호 변경</button></div>'));
+}
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
@@ -170,6 +176,13 @@ async function act(name) {
       var pr=await client.auth.resetPasswordForEmail(re,{redirectTo:location.origin + location.pathname}); if(pr.error) throw pr.error;
       if(app&&app.toast) app.toast('비밀번호 재설정 메일을 보냈습니다'); close(); return;
     }
+    if (name === 'update-password') {
+      var np=value('auth-password'), np2=value('auth-password2');
+      if (np.length < 8) throw new Error('비밀번호는 8자 이상으로 설정해 주세요.');
+      if (np !== np2) throw new Error('비밀번호 확인이 일치하지 않습니다.');
+      var up=await client.auth.updateUser({password:np}); if(up.error) throw up.error;
+      close(); if(app&&app.toast) app.toast('비밀번호를 변경했습니다'); return;
+    }
   } catch (e) {
     if (app&&app.toast) app.toast(errorMessage(e));
   }
@@ -185,6 +198,12 @@ async function init() {
   if (!r.error) await adoptSession(r.data.session);
   client.auth.onAuthStateChange(function (event, next) {
     if (event === 'SIGNED_OUT') { session=null; setStatus('local'); return; }
+    if (event === 'PASSWORD_RECOVERY') {
+      session = next || session;
+      if (session) setStatus('account', session.user.email || '');
+      setTimeout(updatePasswordView, 0);
+      return;
+    }
     if (next && (!session || next.user.id !== session.user.id)) setTimeout(function(){ adoptSession(next); },0);
   });
 }
