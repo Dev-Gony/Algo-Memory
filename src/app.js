@@ -130,7 +130,8 @@ var S = {
   filter: { q: '', cat: '', lv: '', lang: '' }, test: null, pending: false, mode: 'local', canImport: false,
   packSel: {}, packPerDay: 2, packLv: 1, courseLang: 'python',
   drill: null, daily: {}, courseSel: null, hist: [], restCard: null, landingForced: false,
-  detailTab: 'note', explainOpen: null, explainShown: null
+  detailTab: 'note', explainOpen: null, explainShown: null,
+  accountMode: 'local', accountEmail: ''
 };
 
 /* ============ storage ============ */
@@ -168,13 +169,46 @@ function loadLocal() {
     S.daily = o.daily || {};
   } catch (e) { /* storage may be unavailable */ }
 }
+function exportState() {
+  return {
+    version: 1,
+    problems: S.problems,
+    books: S.books,
+    insights: S.insights,
+    settings: S.settings,
+    daily: S.daily
+  };
+}
 function saveLocal() {
-  if (S.mode === 'cloud') return;
+  var state = exportState();
+  try { localStorage.setItem(LS, JSON.stringify(state)); } catch (e) { /* quota or disabled */ }
   try {
-    localStorage.setItem(LS, JSON.stringify({
-      problems: S.problems, books: S.books, insights: S.insights, settings: S.settings, daily: S.daily
-    }));
-  } catch (e) { /* quota or disabled */ }
+    if (window.AlgoCloud && typeof window.AlgoCloud.scheduleSave === 'function') {
+      window.AlgoCloud.scheduleSave(state);
+    }
+  } catch (e2) { /* cloud sync must never block study flow */ }
+}
+function importState(state, opt) {
+  if (!state || typeof state !== 'object') return;
+  S.problems = Array.isArray(state.problems) ? state.problems : [];
+  S.books = Array.isArray(state.books) ? state.books : [];
+  S.insights = Array.isArray(state.insights) ? state.insights : [];
+  S.settings = Object.assign({}, DEFAULTS, state.settings || {});
+  S.daily = state.daily || {};
+  syncCatalogCode();
+  try { localStorage.setItem(LS, JSON.stringify(exportState())); } catch (e) { }
+  if (opt && opt.source === 'account') toast('계정의 학습 기록을 불러왔습니다');
+  render();
+}
+function setAccountStatus(mode, email) {
+  S.accountMode = mode === 'account' ? 'account' : 'local';
+  S.accountEmail = email || '';
+  var btn = document.getElementById('accountBtn');
+  if (btn) {
+    btn.textContent = S.accountMode === 'account' ? '내 계정' : '로그인';
+    btn.classList.toggle('signed', S.accountMode === 'account');
+  }
+  softRender();
 }
 
 /* 저장은 부가 기능이다. 동기 예외든 거부든 화면 흐름을 절대 막지 않는다. */
@@ -1852,6 +1886,13 @@ function viewSettings() {
   h += '<div class="card pad"><div class="sect-h"><h2>일일 목표</h2></div>' +
     '<label class="f"><span>신규 문제 (개)</span><input type="number" id="s-new" min="0" max="20" value="' + st.newGoal + '"></label></div>';
 
+  h += '<div class="card pad account-panel"><div class="sect-h"><h2>학습 기록 저장</h2><span class="sub">' +
+    (S.accountMode === 'account' ? '계정에 동기화 중' : '현재 브라우저에만 저장 중') + '</span></div>' +
+    (S.accountMode === 'account'
+      ? '<p class="small" style="color:var(--ink-2);margin-bottom:12px"><b>' + esc(S.accountEmail) + '</b> 계정으로 학습 기록을 보관합니다. 다른 기기에서도 같은 계정으로 로그인하면 이어서 학습할 수 있습니다.</p><button class="btn accent" id="accountSettingsBtn" data-act="account-open">내 계정</button>'
+      : '<p class="small" style="color:var(--ink-2);margin-bottom:12px">로그인하지 않아도 계속 사용할 수 있습니다. 다만 브라우저 데이터가 삭제되면 학습 기록이 사라질 수 있습니다.</p><button class="btn accent" id="accountSettingsBtn" data-act="account-open">내 학습 기록 저장하기</button>') +
+    '</div>';
+
   h += '<div class="card pad"><div class="row"><button class="btn accent" data-act="s-save">설정 저장</button>' +
     '<span class="small muted">저장 위치: ' + (S.mode === 'cloud' ? '계정 저장소 (기기 간 동기화)' : '이 브라우저') + '</span></div></div>';
 
@@ -2339,6 +2380,10 @@ document.addEventListener('click', function (e) {
   var el = e.target.closest('[data-act]'); if (!el) return;
   var a = el.dataset.act;
 
+  if (a === 'account-open') {
+    var ab = document.getElementById('accountBtn'); if (ab) ab.click();
+    return;
+  }
   if (a === 'select') {
     if (e.target.closest('[data-act]') !== el) return;
     S.sel = (S.sel === el.dataset.p) ? null : el.dataset.p;
@@ -2613,6 +2658,13 @@ try {
   var th = localStorage.getItem('algo-memory:theme');
   if (th) document.documentElement.setAttribute('data-theme', th);
 } catch (e) { }
+
+window.AlgoMemoryApp = {
+  exportState: exportState,
+  importState: importState,
+  setAccountStatus: setAccountStatus,
+  toast: toast
+};
 
 /* ============ boot ============ */
 loadLocal();
