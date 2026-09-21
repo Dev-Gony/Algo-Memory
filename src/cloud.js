@@ -72,8 +72,8 @@ function field(label, id, type, auto) {
 }
 function shell(title, body) {
   return '<div class="auth-backdrop" data-auth-close="1"><div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">' +
-    '<div class="row"><div><div class="small muted">ALGO MEMORY ACCOUNT</div><h2 id="authTitle" style="margin:4px 0 0">' + title + '</h2></div>' +
-    '<span class="grow"></span><button class="iconbtn" data-auth-close="1" aria-label="닫기">×</button></div>' +
+    '<div class="auth-head"><div><div class="auth-kicker">학습 기록 동기화</div><h2 id="authTitle">' + title + '</h2></div>' +
+    '<button class="iconbtn auth-close" data-auth-close="1" aria-label="닫기">×</button></div>' +
     body + '</div></div>';
 }
 function show(html) {
@@ -93,9 +93,9 @@ function loginView() {
       '<button class="btn" data-auth="logout">로그아웃</button></div>'));
     return;
   }
-  show(shell('로그인', '<p class="small muted">로그인하지 않아도 계속 사용할 수 있습니다. 로그인하면 학습 기록을 계정에 저장하고 다른 기기에서 이어갈 수 있습니다.</p>' +
+  show(shell('로그인', '<p class="auth-desc">이 브라우저의 학습 기록은 그대로 유지됩니다. 로그인하면 다른 기기에서도 이어서 학습할 수 있어요.</p>' +
     field('이메일','auth-email','email','email') + field('비밀번호','auth-password','password','current-password') +
-    '<div class="row"><button class="btn accent" data-auth="login">로그인</button>' +
+    '<div class="auth-actions"><button class="btn accent" data-auth="login">로그인</button>' +
     '<button class="btn" data-auth="signup-view">회원가입</button></div>' +
     '<button class="auth-link" data-auth="reset-view">비밀번호를 잊으셨나요?</button>'));
 }
@@ -103,7 +103,7 @@ function signupView() {
   show(shell('회원가입', '<p class="small muted">이메일과 비밀번호만 사용합니다. 가입 후 이메일로 받은 6자리 인증번호를 입력하세요.</p>' +
     field('이메일','auth-email','email','email') + field('비밀번호','auth-password','password','new-password') +
     field('비밀번호 확인','auth-password2','password','new-password') +
-    '<div class="row"><button class="btn accent" data-auth="signup">인증번호 받기</button>' +
+    '<div class="auth-actions"><button class="btn accent" data-auth="signup">인증번호 받기</button>' +
     '<button class="btn" data-auth="login-view">로그인으로</button></div>'));
 }
 function verifyView(email) {
@@ -209,7 +209,8 @@ async function init() {
 }
 
 document.addEventListener('click', function (e) {
-  var closeBtn=e.target.closest('[data-auth-close]'); if(closeBtn){ if(e.target===closeBtn || closeBtn.tagName==='BUTTON') close(); return; }
+  var closeBtn=e.target.closest('[data-auth-close]');
+  if (closeBtn && (e.target === closeBtn || closeBtn.tagName === 'BUTTON')) { close(); return; }
   if (e.target.closest('#accountBtn')) { loginView(); return; }
   var el=e.target.closest('[data-auth]'); if(!el) return;
   var a=el.dataset.auth;
