@@ -1894,7 +1894,7 @@ function viewSettings() {
     '</div>';
 
   h += '<div class="card pad"><div class="row"><button class="btn accent" data-act="s-save">설정 저장</button>' +
-    '<span class="small muted">저장 위치: ' + (S.mode === 'cloud' ? '계정 저장소 (기기 간 동기화)' : '이 브라우저') + '</span></div></div>';
+    '<span class="small muted">저장 위치: ' + (S.accountMode === 'account' ? '이 브라우저 + 계정 동기화' : (S.mode === 'cloud' ? '계정 저장소 (기기 간 동기화)' : '이 브라우저')) + '</span></div></div>';
 
   h += '<div class="card pad"><div class="sect-h"><h2>데이터</h2></div><div class="row">' +
     '<button class="btn" data-act="show-landing">표지 다시 보기</button>' +
