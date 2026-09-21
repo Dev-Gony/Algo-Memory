@@ -27,6 +27,7 @@
     </div>
     <span class="hspace"></span>
     <span class="today mono" id="todayLabel"></span>
+    <button class="btn sm ghost account-btn" id="accountBtn" type="button" hidden>로그인</button>
     <button class="iconbtn" id="themeBtn" title="테마 전환" aria-label="테마 전환">◐</button>
   </div>
   <nav id="nav">
@@ -51,8 +52,10 @@
 <div class="landing" id="landing" hidden></div>
 
 <div class="toast" id="toast"></div>
+<div id="authRoot" hidden></div>
 
-<!--DEV--><script src="app.js"></script><!--/DEV-->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+<!--DEV--><script src="cloud-config.js"></script><script src="cloud.js"></script><script src="app.js"></script><!--/DEV-->
 <!--INJECT:SCRIPT-->
 </body>
 </html>
