@@ -329,6 +329,39 @@ function stripLine(line, mode) {
   }
   return line;
 }
+function tokenKey(s) {
+  var out = [], i = 0;
+  var multi = ['>>=', '<<=', '**=', '//=', '==', '!=', '<=', '>=', ':=', '//', '**', '<<', '>>', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '->', '&&', '||', '<>'];
+  while (i < s.length) {
+    var c = s[i], j, op = null;
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === '"' || c === "'") {
+      var q = c, buf = c; i++;
+      while (i < s.length) {
+        c = s[i]; buf += c; i++;
+        if (c === '\\' && i < s.length) { buf += s[i]; i++; continue; }
+        if (c === q) break;
+      }
+      out.push(buf); continue;
+    }
+    if (/[A-Za-z_]/.test(c)) {
+      j = i + 1;
+      while (j < s.length && /[A-Za-z0-9_]/.test(s[j])) j++;
+      out.push(s.slice(i, j)); i = j; continue;
+    }
+    if (/[0-9]/.test(c)) {
+      j = i + 1;
+      while (j < s.length && /[0-9A-Za-z_.]/.test(s[j])) j++;
+      out.push(s.slice(i, j)); i = j; continue;
+    }
+    for (j = 0; j < multi.length; j++) {
+      if (s.slice(i, i + multi[j].length) === multi[j]) { op = multi[j]; break; }
+    }
+    if (op) { out.push(op); i += op.length; continue; }
+    out.push(c); i++;
+  }
+  return out.join('\u0002');
+}
 function normalize(code, lang) {
   var mode = lang === 'python' ? 'py' : (lang === 'sql' ? 'sql' : 'c');
   var src = stripBlocks(String(code || ''), lang).replace(/\r\n?/g, '\n');
@@ -339,7 +372,8 @@ function normalize(code, lang) {
     var body = s.trim().replace(/[ \t]+/g, ' ');
     if (!body) return;
     var depth = Math.round(lead.length / 4);
-    out.push({ depth: depth, text: body, key: depth + '\u0001' + body });
+    var semanticDepth = lang === 'python' ? depth : 0;
+    out.push({ depth: depth, text: body, key: semanticDepth + '\u0001' + tokenKey(body) });
   });
   return out;
 }
@@ -475,23 +509,34 @@ function grade(original, answer, lang) {
 
   /* pair up miss/extra runs so near-misses read as one edited line */
   var rows = [], tags = {}, i = 0;
-  var surface = 0, hard = 0, weak = [];
+  var surface = 0, hard = 0, style = 0, styles = [], weak = [];
   function tag(t) { tags[t] = (tags[t] || 0) + 1; }
   function markHard(line) { hard++; if (weak.indexOf(line) < 0 && weak.length < 8) weak.push(line); }
   while (i < d.ops.length) {
     var op = d.ops[i];
-    if (op.t === 'same') { rows.push({ k: 'same', d: op.a.depth, t: op.a.text }); i++; continue; }
+    if (op.t === 'same') {
+      if (op.a.text !== op.b.text) {
+        style++;
+        if (styles.length < 8) styles.push({ want: op.a.text, got: op.b.text });
+      }
+      rows.push({ k: 'same', d: op.b.depth, t: op.b.text });
+      i++; continue;
+    }
     var miss = [], extra = [];
     while (i < d.ops.length && d.ops[i].t === 'miss') { miss.push(d.ops[i].a); i++; }
     while (i < d.ops.length && d.ops[i].t === 'extra') { extra.push(d.ops[i].b); i++; }
     var pairs = Math.min(miss.length, extra.length), k;
     for (k = 0; k < pairs; k++) {
       var h = markPair(miss[k].text, extra[k].text);
-      var soft = (miss[k].text === extra[k].text) || pairSim(miss[k].text, extra[k].text) >= 0.75;
+      var indentOnly = miss[k].text === extra[k].text && miss[k].depth !== extra[k].depth;
+      var soft = !indentOnly && pairSim(miss[k].text, extra[k].text) >= 0.75;
       rows.push({ k: 'miss', d: miss[k].depth, html: h[0], soft: soft });
       rows.push({ k: 'extra', d: extra[k].depth, html: h[1], soft: soft });
-      if (miss[k].text === extra[k].text) tag('들여쓰기'); else tag(tagFn(miss[k].text));
-      if (soft) surface++; else markHard(miss[k].text);
+      if (indentOnly) tag('들여쓰기');
+      else tag(tagFn(miss[k].text));
+      if (indentOnly) markHard(miss[k].text);
+      else if (soft) surface++;
+      else markHard(miss[k].text);
     }
     for (k = pairs; k < miss.length; k++) {
       rows.push({ k: 'miss', d: miss[k].depth, t: miss[k].text });
@@ -515,7 +560,7 @@ function grade(original, answer, lang) {
   checks.sort(function (x, y) { return (x.ok === y.ok) ? y.need - x.need : (x.ok ? 1 : -1); });
 
   return {
-    rate: rate, rows: rows, checks: checks, surface: surface, hard: hard, weak: weak,
+    rate: rate, rows: rows, checks: checks, surface: surface, hard: hard, style: style, styles: styles, weak: weak,
     tags: Object.keys(tags).map(function (k) { return { k: k, n: tags[k] }; }).sort(function (a, b) { return b.n - a.n; }),
     origLines: A.length, userLines: B.length, matched: d.lcs
   };
@@ -1615,7 +1660,7 @@ function viewTest() {
     (t.guide ? (v.perfect ? '옮기기<br>성공' : '아직') : (v.perfect ? '암기<br>확인' : '아직')) + '</div>' +
     '<div class="grow"><h2 style="font-size:17px">' +
     (v.perfect
-      ? (t.guide ? '설명대로 옮겼습니다' : (v.clean ? '완벽 재현했습니다' : '통과 — 오타 ' + v.surface + '개는 봐줬습니다'))
+      ? (t.guide ? '설명대로 옮겼습니다' : (v.clean ? '완벽 재현했습니다' : (v.surface ? '통과 — 오타 ' + v.surface + '개는 봐줬습니다' : '구현 재현 성공 — 스타일 차이 ' + v.style + '건')))
       : '아직 재현이 안 됩니다') + '</h2>' +
     '<div class="small muted" style="margin-top:2px">' +
     (t.guide
@@ -1631,7 +1676,7 @@ function viewTest() {
     '<div class="checklist" style="margin-top:14px">' +
     [['핵심 구조 누락 없음', v.missing === 0, v.missing + '개 누락'],
      ['빠지거나 더한 줄 없음', v.hard === 0, v.hard + '줄'],
-     ['오타·들여쓰기', v.surface <= v.grace, v.surface + ' / 허용 ' + v.grace],
+     ['오타 허용 범위', v.surface <= v.grace, v.surface + ' / 허용 ' + v.grace],
      ['제한 시간 내', t.elapsed <= v.lim, mmss(t.elapsed) + ' / ' + mmss(v.lim)]
     ].map(function (row) {
       return '<div class="ck ' + (row[1] ? 'ok' : 'no') + '"><span class="s">' + (row[1] ? '✓' : '✕') + '</span>' +
@@ -1675,14 +1720,23 @@ function viewTest() {
       r.tags.map(function (x) { return '<span class="chip bad">' + esc(x.k) + ' ' + x.n + '</span>'; }).join('') + '</div></div>';
   }
 
-  h += '<div class="sect-h"><h2>라인 비교</h2><span class="sub">공백·주석은 무시하고 구조만 대조합니다</span></div>' +
+  if (r.style) {
+    h += '<div class="card pad style-note" style="margin-bottom:14px"><div class="sect-h"><h2>코드 스타일</h2>' +
+      '<span class="sub">판정 제외 · ' + r.style + '건</span></div>' +
+      '<p class="small muted" style="margin:0 0 10px">공백 위치는 구현 정답 판정에 영향을 주지 않습니다. 가독성을 위해 권장 형태만 참고하세요.</p>' +
+      '<div class="style-list">' + r.styles.map(function (x) {
+        return '<div class="style-row"><code>' + esc(x.got) + '</code><span>→</span><code>' + esc(x.want) + '</code></div>';
+      }).join('') + '</div></div>';
+  }
+
+  h += '<div class="sect-h"><h2>라인 비교</h2><span class="sub">연산자·쉼표 주변 공백과 주석은 판정에서 제외합니다</span></div>' +
     '<div class="difflist scroller">' + r.rows.map(function (row) {
       var mk = row.k === 'same' ? ' ' : (row.k === 'miss' ? '−' : '+');
       var ind = row.d ? '<span class="ind">' + '·   '.repeat(row.d) + '</span>' : '';
       var body = row.html != null ? row.html : esc(row.t);
       return '<div class="dl ' + row.k + (row.soft ? ' soft' : '') + '"><span class="mk">' + mk + '</span><span class="tx">' + ind + body + '</span></div>';
     }).join('') + '</div>' +
-    '<div class="small muted" style="margin-top:8px">− 원본에 있는데 쓰지 못한 줄 · + 원본에 없는 줄 · 흐린 것은 오타로 보고 봐준 줄</div>';
+    '<div class="small muted" style="margin-top:8px">− 원본에 있는데 쓰지 못한 줄 · + 원본에 없는 줄 · 공백 스타일은 정답 판정에서 제외</div>';
   return h;
 }
 
@@ -1860,8 +1914,8 @@ function viewSettings() {
   h += '<div class="card pad"><div class="sect-h"><h2>암기 판정</h2>' +
     '<span class="sub">"정말 다 외웠는가"의 기준</span></div>' +
     '<p class="small" style="color:var(--ink-2);margin-bottom:14px">구조 누락 0 + 빠지거나 더한 줄 0 + 제한 시간 내를 만족하면 통과입니다. ' +
-    '오타나 들여쓰기처럼 논리와 무관한 실수는 아래 허용치까지 봐줍니다. 0으로 두면 한 글자도 안 봐줍니다.</p>' +
-    '<div class="f2" style="margin-bottom:0"><label class="f"><span>오타·들여쓰기 허용 개수</span><input type="number" id="s-grace" min="0" max="5" value="' + st.grace + '"></label>' +
+    '연산자·쉼표 주변 공백은 판정에서 제외하고, Python 들여쓰기는 문법과 실행 흐름에 영향을 주므로 엄격하게 봅니다. 단순 오타만 아래 허용치까지 봐줍니다.</p>' +
+    '<div class="f2" style="margin-bottom:0"><label class="f"><span>단순 오타 허용 개수</span><input type="number" id="s-grace" min="0" max="5" value="' + st.grace + '"></label>' +
     '<label class="f"><span>연속 몇 회면 암기 완료</span><input type="number" id="s-streak" min="1" max="10" value="' + st.streakNeed + '"></label></div>' +
     '<div class="f2"><label class="f"><span>제한 시간 — 줄당 초</span><input type="number" id="s-spl" min="2" max="60" value="' + st.secPerLine + '"></label>' +
     '<label class="f"><span>제한 시간 — 기본 여유 초</span><input type="number" id="s-base" min="0" max="300" value="' + st.baseSec + '"></label></div>' +
@@ -2284,8 +2338,8 @@ function submitTest() {
   var grace = S.settings.grace;
   t.verdict = {
     lim: lim, missing: missing, grace: grace,
-    surface: t.result.surface, hard: t.result.hard,
-    clean: t.result.surface === 0 && t.result.hard === 0 && missing === 0,
+    surface: t.result.surface, hard: t.result.hard, style: t.result.style || 0,
+    clean: t.result.surface === 0 && t.result.hard === 0 && missing === 0 && (t.result.style || 0) === 0,
     perfect: t.result.hard === 0 && missing === 0 && t.result.surface <= grace && t.elapsed <= lim
   };
   render(); toTop();

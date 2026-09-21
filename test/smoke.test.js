@@ -280,6 +280,38 @@ test('세 문장 설명을 쓰면 모범 해설과 대조하고 저장된다', a
   assert.strictEqual(ex.a[1], '이름표 붙은 상자에 값을 넣는다');
 });
 
+test('연산자와 쉼표 주변 공백은 정답 판정에서 무시한다', async () => {
+  const p = problem({ code: 'a = 7\nb = 3\nprint(a + b)\nprint(a - b)\nprint(a * b)\nprint(a // b)\nprint(a % b)' });
+  const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="live"]'); await t.tick();
+  const ta = t.d.getElementById('codeInput');
+  ta.value = 'a=7\nb=3\nprint(a+b)\nprint(a-b)\nprint(a*b)\nprint(a//b)\nprint(a%b)';
+  ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  t.click('[data-act="submit"]'); await t.tick();
+  assert.ok(t.d.querySelector('.verdict-card').classList.contains('ok'), '공백 차이는 통과해야 한다');
+  assert.ok(t.d.querySelector('.verdict-card h2').textContent.includes('스타일 차이'),
+    '공백 차이는 스타일 피드백으로 분리되어야 한다');
+  assert.ok(t.d.querySelector('.style-note'), '스타일 안내 카드가 보여야 한다');
+});
+
+test('Python 들여쓰기는 스타일이 아니라 구현 오류로 판정한다', async () => {
+  const code = 'def solve(x):\n    if x > 0:\n        return x\n    return 0';
+  const p = problem({ code, title: '들여쓰기 판정' });
+  const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: { grace: 5 } } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="live"]'); await t.tick();
+  const ta = t.d.getElementById('codeInput');
+  ta.value = 'def solve(x):\n    if x > 0:\n    return x\n    return 0';
+  ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  t.click('[data-act="submit"]'); await t.tick();
+  assert.ok(t.d.querySelector('.verdict-card').classList.contains('no'), '들여쓰기 오류는 실패해야 한다');
+});
+
 test('오타 하나는 봐주고 줄 누락은 봐주지 않는다', async () => {
   const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
   await t.tick();
