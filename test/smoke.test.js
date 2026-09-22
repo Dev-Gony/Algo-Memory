@@ -150,6 +150,34 @@ test('이미 통과한 문제는 설명 단계를 건너뛴다', async () => {
   assert.ok(t.d.querySelector('[data-act="giveup"]'), '실전에는 포기 버튼이 있다');
 });
 
+test('예약 복습은 빈 화면 대신 핵심 단서를 먼저 보여준다', async () => {
+  const p = problem({
+    brief: 'N까지의 합을 구한다.',
+    logic: '반복문으로 누적합을 만든다.',
+    schedule: [{ round: 1, due: today(), done: false }]
+  });
+  const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  const review = [...t.d.querySelectorAll('[data-act="live"]')].find((el) => el.dataset.i === '0');
+  assert.ok(review, '오늘 복습 버튼이 있어야 한다');
+  assert.strictEqual(review.textContent.trim(), '복습', '예약 학습은 실전이 아니라 복습으로 표시한다');
+  review.click(); await t.tick();
+  assert.ok(t.d.querySelector('.review-cue'), '복습 단서 카드가 보여야 한다');
+  assert.ok(t.d.querySelector('.review-cue').textContent.includes('핵심 원리'), '핵심 원리 단서가 있어야 한다');
+  assert.ok(!t.d.querySelector('.hintbox').textContent.includes('실전입니다'), '복습에서 실전 경고문을 보여주면 안 된다');
+});
+
+test('수동 실전은 복습 단서를 보여주지 않는다', async () => {
+  const p = problem({ brief: 'N까지의 합을 구한다.', logic: '반복문으로 누적합을 만든다.' });
+  const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="live"]'); await t.tick();
+  assert.ok(!t.d.querySelector('.review-cue'), '실전에는 복습 단서가 없어야 한다');
+  assert.ok(t.d.querySelector('.hintbox').textContent.includes('실전입니다'), '실전 경고문은 유지한다');
+});
+
 test('설명 단계는 줄 순서대로 안내하고 암기 판정에 넣지 않는다', async () => {
   const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
   await t.tick();
