@@ -1607,17 +1607,46 @@ function detailLog(p) {
   }).join('') + '</div>';
 }
 
+function requiredNames(p) {
+  if (!p || (p.lang || 'python') !== 'python') return [];
+  var src = catalogCode(p), out = [], seen = {};
+  function add(x) {
+    if (!x || seen[x] || ['True','False','None'].indexOf(x) >= 0) return;
+    seen[x] = true; out.push(x);
+  }
+  src.split('\n').forEach(function (line) {
+    var m = line.match(/^\s*(?:def|class)\s+([A-Za-z_]\w*)/);
+    if (m) add(m[1]);
+    m = line.match(/^\s*def\s+[A-Za-z_]\w*\s*\(([^)]*)\)/);
+    if (m) m[1].split(',').forEach(function (x) { add((x.split('=')[0] || '').replace(/[:*]/g, '').trim()); });
+    m = line.match(/^\s*([A-Za-z_]\w*)\s*(?:=|\+=|-=|\*=|\/=|\/%=|%=|\//=)/);
+    if (m) add(m[1]);
+    m = line.match(/^\s*for\s+([A-Za-z_]\w*)\s+in\b/);
+    if (m) add(m[1]);
+  });
+  return out.slice(0, 10);
+}
 function reviewCue(p) {
   var c = noteOf(p);
-  var core = (c && c.story) || p.logic || p.brief || '핵심 구현 순서를 떠올려 보세요.';
-  var keys = (c && c.keys && c.keys.length) ? c.keys.slice(0, 3) : [];
+  var req = (c && c.walk && c.walk.length) ? c.walk.slice() : [];
+  if (!req.length) {
+    if (p.brief) req.push(p.brief);
+    if (p.logic) req.push(p.logic);
+  }
+  if (!req.length) req.push('문제의 요구사항을 만족하는 코드를 작성한다.');
+  var names = requiredNames(p);
   var h = '<div class="card pad review-cue" style="margin-bottom:12px">' +
-    '<div class="sect-h"><h2 style="font-size:14px">복습 단서</h2><span class="sub">코드는 보여주지 않습니다</span></div>';
-  if (p.brief) h += '<div class="review-cue-block"><div class="small muted">무엇을 구현하나</div><div>' + esc(p.brief) + '</div></div>';
-  h += '<div class="review-cue-block"><div class="small muted">핵심 원리</div><div>' + esc(core) + '</div></div>';
-  if (keys.length) h += '<div class="review-cue-block"><div class="small muted">기억할 것</div><ul>' +
-    keys.map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></div>';
-  return h + '</div>';
+    '<div class="sect-h"><h2 style="font-size:14px">복습 문제</h2><span class="sub">정답 코드는 숨김</span></div>' +
+    '<p class="small muted review-intro">아래 요구사항을 순서대로 만족하는 코드를 작성하세요.' +
+    (names.length ? ' 표시된 변수명·함수명은 그대로 사용합니다.' : '') + '</p>';
+  if (names.length) {
+    h += '<div class="required-names"><span class="small muted">사용할 이름</span>' +
+      names.map(function (x) { return '<code>' + esc(x) + '</code>'; }).join('') + '</div>';
+  }
+  h += '<ol class="review-requirements">' +
+    req.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') +
+    '</ol></div>';
+  return h;
 }
 
 function viewTest() {
@@ -1641,8 +1670,7 @@ function viewTest() {
         ? '<div class="hintbox">설명을 순서대로 읽으면서 그에 맞는 코드를 적으세요. ' +
           '코드를 보여주지는 않습니다. 이 단계는 암기 판정에 들어가지 않습니다.</div>'
         : (isReview
-          ? '<div class="hintbox review-hint">복습입니다. 아래 단서를 보고 구현 순서를 먼저 떠올린 뒤 작성하세요. ' +
-            '정답 코드는 보여주지 않습니다.</div>'
+          ? '<div class="hintbox review-hint">복습입니다. 아래 문제 설명과 요구사항을 읽고 코드를 작성하세요. 정답 코드는 보여주지 않습니다.</div>'
           : '<div class="hintbox" style="border-style:solid;border-color:var(--bad);color:var(--bad)">' +
             '실전입니다. 구조 누락 0 + 빠진 줄 0 + 제한 시간 내여야 통과입니다. 막히면 아래 모르겠다를 누르세요.</div>')) +
       (isReview ? reviewCue(p) : '') +
@@ -1657,7 +1685,7 @@ function viewTest() {
       '<div class="editcol">' +
       '<div class="editor-wrap"><div class="gutter" id="gutter">1</div>' +
       '<textarea id="codeInput" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="' +
-      (t.guide ? '왼쪽 설명을 보면서 코드를 적으세요.' : (isReview ? '위 단서를 떠올리며 코드를 작성하세요.' : '빈 화면에서 정답 코드를 처음부터 끝까지 작성하세요.')) + '"></textarea></div>' +
+      (t.guide ? '왼쪽 설명을 보면서 코드를 적으세요.' : (isReview ? '위 요구사항을 만족하도록 코드를 작성하세요.' : '빈 화면에서 정답 코드를 처음부터 끝까지 작성하세요.')) + '"></textarea></div>' +
       '<div class="editbar"><span id="counter" class="mono">0줄 · 0자</span><span class="grow"></span>' +
       '<span>Tab 들여쓰기 · Ctrl/⌘+Enter 제출</span>' +
       (t.guide ? '' : '<button class="btn danger" data-act="giveup">' + (isReview ? '막혔다' : '모르겠다') + '</button>') +
