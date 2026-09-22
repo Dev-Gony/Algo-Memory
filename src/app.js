@@ -878,7 +878,9 @@ function viewDash() {
       '</div></div>';
   }
   var doneT = doneOn(T), totalT = doneT + due.length;
-  var newT = S.problems.filter(function (p) { return p.createdAt === T; }).length;
+  var newToday = S.problems.filter(function (p) { return p.createdAt === T; });
+  var newPending = newToday.filter(function (p) { return !(p.attempts || []).length; });
+  var newDone = newToday.length - newPending.length;
   var over = due.filter(function (d) { return d.late > 0; }).length;
 
   var h = '';
@@ -894,8 +896,9 @@ function viewDash() {
     tile('오늘의 복습', doneT + '<em>/' + totalT + '</em>', '건',
       over ? over + '건 지연 중' : '지연 없음',
       totalT ? doneT / totalT * 100 : 100, over ? 'bad' : '') +
-    tile('신규 등록', newT + '<em>/' + S.settings.newGoal + '</em>', '문제', '오늘 새로 암기할 문제',
-      S.settings.newGoal ? newT / S.settings.newGoal * 100 : 100) +
+    tile('신규 학습', newDone + '<em>/' + newToday.length + '</em>', '문제',
+      newToday.length ? '오늘 배정된 신규 문제' : '오늘 배정된 신규 문제 없음',
+      newToday.length ? newDone / newToday.length * 100 : 100) +
     (S.problems.length ? tile('암기 완료', masteredCount() + '<em>/' + S.problems.length + '</em>', '개',
       '연속 ' + S.settings.streakNeed + '회 완벽 재현',
       masteredCount() / S.problems.length * 100) : '') +
@@ -2063,9 +2066,6 @@ function viewSettings() {
     '<p class="small muted">코드를 보여주는 대신 줄 설명만 순서대로 보여주고 직접 적게 합니다. ' +
     '단서를 하나씩 걷어내는 중간 단계라 암기 판정에는 넣지 않습니다.</p></div>';
 
-  h += '<div class="card pad"><div class="sect-h"><h2>일일 목표</h2></div>' +
-    '<label class="f"><span>신규 문제 (개)</span><input type="number" id="s-new" min="0" max="20" value="' + st.newGoal + '"></label></div>';
-
   h += '<div class="card pad account-panel"><div class="sect-h"><h2>학습 기록 저장</h2><span class="sub">' +
     (S.accountMode === 'account' ? '계정에 동기화 중' : '현재 브라우저에만 저장 중') + '</span></div>' +
     (S.accountMode === 'account'
@@ -2741,7 +2741,7 @@ document.addEventListener('click', function (e) {
     iv.sort(function (a2, b2) { return a2 - b2; });
     S.settings = Object.assign({}, S.settings, {
       intervals: iv, pass: clamp(num('s-pass', 80), 10, 100),
-      retry: val('s-retry') === '1', newGoal: clamp(num('s-new', 1), 0, 20),
+      retry: val('s-retry') === '1',
       streakNeed: clamp(num('s-streak', 3), 1, 10),
       secPerLine: clamp(num('s-spl', 10), 2, 60),
       baseSec: clamp(num('s-base', 30), 0, 300),
