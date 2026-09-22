@@ -1005,7 +1005,19 @@ if __name__ == "__main__":
         print("L%d %-7s %2d개 · 평균 %.1f줄 · 해설 %d개" %
               (lv, names[lv], len(rows), avg, len([r for r in rows if r["walk"]])))
 
-    out = [{k: v for k, v in i.items() if not k.startswith("_")} for i in Q]
+    import os
+    import json
+    _demo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demos.json")
+    _demos = {}
+    if os.path.exists(_demo_path):
+        with open(_demo_path, "r", encoding="utf-8") as _f:
+            _demos = json.load(_f)
+    out = []
+    for i in Q:
+        row = {k: v for k, v in i.items() if not k.startswith("_")}
+        if i["id"] in _demos:
+            row["demo"] = _demos[i["id"]]
+        out.append(row)
     dest = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "sql-catalog.json")
     with open(dest, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
