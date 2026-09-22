@@ -180,7 +180,9 @@ test('복습 문제는 정답에서 요구하는 변수명을 명시한다', asy
   const cue = t.d.querySelector('.review-cue').textContent;
   assert.ok(cue.includes('a') && cue.includes('b'), '정답이 a, b를 요구하면 복습 문제에도 이름을 알려야 한다');
   assert.ok(cue.includes('7') && cue.includes('3'), '정답이 요구하는 구체 값도 문제 설명에 있어야 한다');
-  assert.ok(cue.includes('몫') && cue.includes('나머지'), '구현해야 할 연산 요구사항이 보여야 한다');
+  assert.ok(cue.includes('a + b') && cue.includes('a - b') && cue.includes('a * b'), '연산은 실제 코드 표현식으로 안내해야 한다');
+  assert.ok(cue.includes('a // b') && cue.includes('a % b'), '몫과 나머지도 실제 코드 표현식으로 안내해야 한다');
+  assert.ok(!cue.includes('7 + 3') && !cue.includes('10이 나온다') && !cue.includes('4가 나온다'), '정답 결과를 복습 문제에 노출하면 안 된다');
 });
 
 test('수동 실전은 복습 단서를 보여주지 않는다', async () => {
