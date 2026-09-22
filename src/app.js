@@ -1003,7 +1003,7 @@ function viewDash() {
         (d.s.retry ? '<span class="chip warn">재복습</span>' : '') +
         '</div></div>' +
         masteryChip(mastery(d.p)) +
-        '<button class="btn accent sm" data-act="live" data-p="' + d.p.id + '" data-i="' + d.i + '">실전</button>' +
+        '<button class="btn accent sm" data-act="live" data-p="' + d.p.id + '" data-i="' + d.i + '">복습</button>' +
         (d.late > 0 ? '<button class="btn sm ghost" data-act="push" data-p="' + d.p.id + '" data-i="' + d.i + '" title="오늘로 이동">오늘로</button>' : '') +
         '</div>';
     }).join('') + '</div>';
@@ -1589,7 +1589,7 @@ function detailSched(p) {
     return '<div class="row small" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">' +
       '<span class="mono">' + s.round + '회차' + (s.retry ? ' (재)' : '') + '</span>' +
       '<span class="mono muted">' + esc(s.due) + '</span>' + st +
-      (i === nextIdx ? '<button class="btn sm" data-act="live" data-p="' + p.id + '" data-i="' + i + '">실전</button>' : '') +
+      (i === nextIdx ? '<button class="btn sm" data-act="live" data-p="' + p.id + '" data-i="' + i + '">복습</button>' : '') +
       '</div>';
   }).join('') + '</div>' +
   '<div class="small muted" style="margin-top:10px">등록일 ' + esc(p.createdAt) +
@@ -1607,6 +1607,19 @@ function detailLog(p) {
   }).join('') + '</div>';
 }
 
+function reviewCue(p) {
+  var c = noteOf(p);
+  var core = (c && c.story) || p.logic || p.brief || '핵심 구현 순서를 떠올려 보세요.';
+  var keys = (c && c.keys && c.keys.length) ? c.keys.slice(0, 3) : [];
+  var h = '<div class="card pad review-cue" style="margin-bottom:12px">' +
+    '<div class="sect-h"><h2 style="font-size:14px">복습 단서</h2><span class="sub">코드는 보여주지 않습니다</span></div>';
+  if (p.brief) h += '<div class="review-cue-block"><div class="small muted">무엇을 구현하나</div><div>' + esc(p.brief) + '</div></div>';
+  h += '<div class="review-cue-block"><div class="small muted">핵심 원리</div><div>' + esc(core) + '</div></div>';
+  if (keys.length) h += '<div class="review-cue-block"><div class="small muted">기억할 것</div><ul>' +
+    keys.map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></div>';
+  return h + '</div>';
+}
+
 function viewTest() {
   var t = S.test; if (!t) return '';
   var p = S.problems.filter(function (x) { return x.id === t.pid; })[0];
@@ -1614,8 +1627,9 @@ function viewTest() {
   var lim = timeLimit(p);
 
   if (!t.result) {
+    var isReview = !t.guide && !t.gate && t.idx != null;
     var modeLabel = t.guide ? '설명 보고 쓰기'
-      : (t.gate ? '오늘의 관문' : (t.idx != null ? t.round + '회차 복습' : '실전'));
+      : (t.gate ? '오늘의 관문' : (isReview ? t.round + '회차 복습' : '실전'));
     var g = t.guide ? guideItems(p) : null;
     return '<div class="testhead">' +
       '<button class="btn ghost sm" data-act="test-exit">← 나가기</button>' +
@@ -1626,8 +1640,12 @@ function viewTest() {
       (t.guide
         ? '<div class="hintbox">설명을 순서대로 읽으면서 그에 맞는 코드를 적으세요. ' +
           '코드를 보여주지는 않습니다. 이 단계는 암기 판정에 들어가지 않습니다.</div>'
-        : '<div class="hintbox" style="border-style:solid;border-color:var(--bad);color:var(--bad)">' +
-          '실전입니다. 구조 누락 0 + 빠진 줄 0 + 제한 시간 내여야 통과입니다. 막히면 아래 모르겠다를 누르세요.</div>') +
+        : (isReview
+          ? '<div class="hintbox review-hint">복습입니다. 아래 단서를 보고 구현 순서를 먼저 떠올린 뒤 작성하세요. ' +
+            '정답 코드는 보여주지 않습니다.</div>'
+          : '<div class="hintbox" style="border-style:solid;border-color:var(--bad);color:var(--bad)">' +
+            '실전입니다. 구조 누락 0 + 빠진 줄 0 + 제한 시간 내여야 통과입니다. 막히면 아래 모르겠다를 누르세요.</div>')) +
+      (isReview ? reviewCue(p) : '') +
       '<div class="' + (t.guide ? 'guidewrap' : '') + '">' +
       (g
         ? '<div class="guidecol"><div class="small muted" style="margin-bottom:8px">' +
@@ -1639,11 +1657,11 @@ function viewTest() {
       '<div class="editcol">' +
       '<div class="editor-wrap"><div class="gutter" id="gutter">1</div>' +
       '<textarea id="codeInput" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="' +
-      (t.guide ? '왼쪽 설명을 보면서 코드를 적으세요.' : '빈 화면에서 정답 코드를 처음부터 끝까지 작성하세요.') + '"></textarea></div>' +
+      (t.guide ? '왼쪽 설명을 보면서 코드를 적으세요.' : (isReview ? '위 단서를 떠올리며 코드를 작성하세요.' : '빈 화면에서 정답 코드를 처음부터 끝까지 작성하세요.')) + '"></textarea></div>' +
       '<div class="editbar"><span id="counter" class="mono">0줄 · 0자</span><span class="grow"></span>' +
       '<span>Tab 들여쓰기 · Ctrl/⌘+Enter 제출</span>' +
-      (t.guide ? '' : '<button class="btn danger" data-act="giveup">모르겠다</button>') +
-      '<button class="btn accent" data-act="submit">제출하고 채점</button></div>' +
+      (t.guide ? '' : '<button class="btn danger" data-act="giveup">' + (isReview ? '막혔다' : '모르겠다') + '</button>') +
+      '<button class="btn accent" data-act="submit">' + (isReview ? '작성 완료 · 확인' : '제출하고 채점') + '</button></div>' +
       '</div></div>';
   }
 
