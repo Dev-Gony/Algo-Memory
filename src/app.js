@@ -1607,6 +1607,7 @@ function detailLog(p) {
   }).join('') + '</div>';
 }
 
+
 function requiredNames(p) {
   if (!p || (p.lang || 'python') !== 'python') return [];
   var src = catalogCode(p), out = [], seen = {};
@@ -1626,14 +1627,80 @@ function requiredNames(p) {
   });
   return out.slice(0, 10);
 }
+function reviewRequirements(p) {
+  var lang = p.lang || 'python';
+  var src = catalogCode(p).replace(/\r\n?/g, '\n');
+  var rows = src.split('\n').filter(function (line) { return line.trim() && !/^\s*#/.test(line); });
+  var out = [], bt = String.fromCharCode(96);
+  function q(x) { return bt + String(x).trim() + bt; }
+
+  rows.forEach(function (raw) {
+    var s = raw.trim(), m;
+
+    if (lang === 'sql') {
+      if ((m = s.match(/^SELECT\s+(.+)$/i))) { out.push(q(m[1]) + ' 열을 조회한다.'); return; }
+      if ((m = s.match(/^FROM\s+(.+)$/i))) { out.push(q(m[1]) + '에서 조회한다.'); return; }
+      if ((m = s.match(/^WHERE\s+(.+)$/i))) { out.push('조건 ' + q(m[1]) + '을 만족하는 행만 선택한다.'); return; }
+      if ((m = s.match(/^AND\s+(.+)$/i))) { out.push('추가로 조건 ' + q(m[1]) + '을 만족해야 한다.'); return; }
+      if ((m = s.match(/^OR\s+(.+)$/i))) { out.push('또는 조건 ' + q(m[1]) + '을 만족해야 한다.'); return; }
+      if ((m = s.match(/^GROUP BY\s+(.+)$/i))) { out.push(q(m[1]) + ' 기준으로 그룹화한다.'); return; }
+      if ((m = s.match(/^HAVING\s+(.+)$/i))) { out.push('그룹 조건 ' + q(m[1]) + '을 적용한다.'); return; }
+      if ((m = s.match(/^ORDER BY\s+(.+?);?$/i))) { out.push(q(m[1]) + ' 기준으로 정렬한다.'); return; }
+      if ((m = s.match(/^LIMIT\s+(.+?);?$/i))) { out.push('결과를 ' + q(m[1]) + '건으로 제한한다.'); return; }
+      if ((m = s.match(/^(LEFT |RIGHT |INNER |FULL )?JOIN\s+(.+)$/i))) { out.push(q(s.replace(/;$/,'')) + ' 조인을 수행한다.'); return; }
+      if ((m = s.match(/^ON\s+(.+)$/i))) { out.push('조인 조건으로 ' + q(m[1]) + '을 사용한다.'); return; }
+      out.push(q(s.replace(/;$/,'')) + ' 구문을 구성한다.');
+      return;
+    }
+
+    if ((m = s.match(/^def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*:/))) {
+      out.push('함수 ' + q(m[1]) + '를 정의하고 매개변수 ' + q(m[2] || '없음') + '을 사용한다.'); return;
+    }
+    if ((m = s.match(/^class\s+([A-Za-z_]\w*)[^:]*:/))) {
+      out.push('클래스 ' + q(m[1]) + '를 정의한다.'); return;
+    }
+    if ((m = s.match(/^if\s+(.+)\s*:/))) {
+      out.push('조건 ' + q(m[1]) + '이 참일 때 아래 로직을 수행한다.'); return;
+    }
+    if ((m = s.match(/^elif\s+(.+)\s*:/))) {
+      out.push('그렇지 않고 조건 ' + q(m[1]) + '이 참일 때 아래 로직을 수행한다.'); return;
+    }
+    if (/^else\s*:/.test(s)) { out.push('그 외의 경우에 아래 로직을 수행한다.'); return; }
+    if ((m = s.match(/^for\s+(.+?)\s+in\s+(.+)\s*:/))) {
+      out.push(q(m[1]) + '를 ' + q(m[2]) + '에서 순회하며 아래 로직을 반복한다.'); return;
+    }
+    if ((m = s.match(/^while\s+(.+)\s*:/))) {
+      out.push('조건 ' + q(m[1]) + '이 참인 동안 아래 로직을 반복한다.'); return;
+    }
+    if ((m = s.match(/^return(?:\s+(.+))?$/))) {
+      out.push(m[1] ? q(m[1]) + '을 반환한다.' : '값 없이 반환한다.'); return;
+    }
+    if ((m = s.match(/^print\((.*)\)$/))) {
+      out.push(q(m[1]) + '의 값을 출력한다.'); return;
+    }
+    if ((m = s.match(/^([A-Za-z_]\w*(?:\[[^\]]+\])?)\s*=\s*(.+)$/))) {
+      out.push(q(m[1]) + '에 ' + q(m[2]) + '을 저장한다.'); return;
+    }
+    if ((m = s.match(/^([A-Za-z_]\w*)\s*(\+=|-=|\*=|\/=|%=|\/\/=|\*\*=)\s*(.+)$/))) {
+      out.push(q(m[1]) + '에 ' + q(m[3]) + '을 ' + q(m[2]) + ' 연산으로 반영한다.'); return;
+    }
+    if ((m = s.match(/^([A-Za-z_]\w*)\.append\((.*)\)$/))) {
+      out.push(q(m[1]) + '에 ' + q(m[2]) + '을 추가한다.'); return;
+    }
+    if ((m = s.match(/^from\s+(.+)\s+import\s+(.+)$/))) {
+      out.push(q(m[1]) + '에서 ' + q(m[2]) + '을 가져온다.'); return;
+    }
+    if ((m = s.match(/^import\s+(.+)$/))) {
+      out.push(q(m[1]) + ' 모듈을 가져온다.'); return;
+    }
+
+    out.push('다음 동작을 구현한다: ' + q(s));
+  });
+
+  return out.length ? out : ['문제의 요구사항을 만족하는 코드를 작성한다.'];
+}
 function reviewCue(p) {
-  var c = noteOf(p);
-  var req = (c && c.walk && c.walk.length) ? c.walk.slice() : [];
-  if (!req.length) {
-    if (p.brief) req.push(p.brief);
-    if (p.logic) req.push(p.logic);
-  }
-  if (!req.length) req.push('문제의 요구사항을 만족하는 코드를 작성한다.');
+  var req = reviewRequirements(p);
   var names = requiredNames(p);
   var h = '<div class="card pad review-cue" style="margin-bottom:12px">' +
     '<div class="sect-h"><h2 style="font-size:14px">복습 문제</h2><span class="sub">정답 코드는 숨김</span></div>' +
