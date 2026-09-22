@@ -1619,7 +1619,7 @@ function requiredNames(p) {
     if (m) add(m[1]);
     m = line.match(/^\s*def\s+[A-Za-z_]\w*\s*\(([^)]*)\)/);
     if (m) m[1].split(',').forEach(function (x) { add((x.split('=')[0] || '').replace(/[:*]/g, '').trim()); });
-    m = line.match(/^\s*([A-Za-z_]\w*)\s*(?:=|\+=|-=|\*=|\/=|\/%=|%=|\//=)/);
+    m = line.match(/^\s*([A-Za-z_]\w*)\s*(?:=|\+=|-=|\*=|\/=|%=|\/\/=|\*\*=|&=|\|=|\^=)/);
     if (m) add(m[1]);
     m = line.match(/^\s*for\s+([A-Za-z_]\w*)\s+in\b/);
     if (m) add(m[1]);
