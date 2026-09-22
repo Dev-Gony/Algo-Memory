@@ -2257,6 +2257,10 @@ function traceInput() {
   }
   ta.value = t.slice(0, dr.pos);
   paintTrace();
+  if (dr.pos >= t.length) {
+    render();
+    return;
+  }
 }
 
 function reject(bad) {
