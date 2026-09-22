@@ -49,14 +49,18 @@ function open({ storage, db } = {}) {
     texts: (sel) => [...d.querySelectorAll(sel)].map((e) => e.textContent.trim().replace(/\s+/g, ' ')),
     view: () => [...d.querySelectorAll('.view')].filter((e) => e.classList.contains('on')).map((e) => e.id)[0],
     local: () => JSON.parse(w.localStorage.getItem('algo-memory:v1') || 'null'),
-    async trace(code) {
+    async trace(code, options) {
       const ta = () => d.getElementById('tracein');
       for (let k = 0; k < code.length; k++) {
         if (!ta()) break;
         ta().value = code.slice(0, k + 1);
         ta().dispatchEvent(new w.Event('input', { bubbles: true }));
       }
-      await api.tick(60);
+      await api.tick(30);
+      if (!(options && options.autoNext === false)) {
+        const next = d.querySelector('[data-act="drill-next"]');
+        if (next) { next.click(); await api.tick(60); }
+      }
     }
   };
   return api;
