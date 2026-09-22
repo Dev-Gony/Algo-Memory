@@ -277,6 +277,11 @@ ol.guide li.on::before{background:var(--accent);border-color:transparent;color:v
 .run-preview{border:1px solid var(--line);border-radius:10px;background:var(--panel-2);padding:12px}
 .run-line{padding:7px 9px;border-radius:7px;background:var(--panel);border:1px solid var(--line);margin-top:6px;white-space:pre-wrap;word-break:break-word}
 .drill-complete{border-color:color-mix(in srgb, var(--good) 30%, var(--line))}
+.review-hint{border-style:solid;border-color:color-mix(in srgb, var(--accent) 45%, var(--line));color:var(--ink)}
+.review-cue{background:var(--panel-2);box-shadow:none;border-color:color-mix(in srgb, var(--accent) 24%, var(--line))}
+.review-cue-block + .review-cue-block{margin-top:10px}
+.review-cue-block > div:last-child{line-height:1.65}
+.review-cue-block ul{margin:5px 0 0;padding-left:18px;line-height:1.55}
 .style-note{border-color:color-mix(in srgb, var(--accent) 24%, var(--line))}
 .style-list{display:grid;gap:7px}
 .style-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;font-family:var(--mono);font-size:12px}
