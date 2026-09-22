@@ -162,9 +162,25 @@ test('예약 복습은 빈 화면 대신 핵심 단서를 먼저 보여준다', 
   assert.ok(review, '오늘 복습 버튼이 있어야 한다');
   assert.strictEqual(review.textContent.trim(), '복습', '예약 학습은 실전이 아니라 복습으로 표시한다');
   review.click(); await t.tick();
-  assert.ok(t.d.querySelector('.review-cue'), '복습 단서 카드가 보여야 한다');
-  assert.ok(t.d.querySelector('.review-cue').textContent.includes('핵심 원리'), '핵심 원리 단서가 있어야 한다');
+  assert.ok(t.d.querySelector('.review-cue'), '복습 문제 카드가 보여야 한다');
+  assert.ok(t.d.querySelector('.review-cue').textContent.includes('요구사항'), '문제 요구사항 안내가 있어야 한다');
   assert.ok(!t.d.querySelector('.hintbox').textContent.includes('실전입니다'), '복습에서 실전 경고문을 보여주면 안 된다');
+});
+
+test('복습 문제는 정답에서 요구하는 변수명을 명시한다', async () => {
+  const code = 'a = 7\nb = 3\n\nprint(a + b)\nprint(a - b)\nprint(a * b)\nprint(a // b)\nprint(a % b)';
+  const p = problem({
+    srcId: 's0-math', title: '사칙연산과 나머지', code,
+    schedule: [{ round: 1, due: today(), done: false }]
+  });
+  const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  const review = [...t.d.querySelectorAll('[data-act="live"]')].find((el) => el.dataset.i === '0');
+  review.click(); await t.tick();
+  const cue = t.d.querySelector('.review-cue').textContent;
+  assert.ok(cue.includes('a') && cue.includes('b'), '정답이 a, b를 요구하면 복습 문제에도 이름을 알려야 한다');
+  assert.ok(cue.includes('7') && cue.includes('3'), '정답이 요구하는 구체 값도 문제 설명에 있어야 한다');
+  assert.ok(cue.includes('몫') && cue.includes('나머지'), '구현해야 할 연산 요구사항이 보여야 한다');
 });
 
 test('수동 실전은 복습 단서를 보여주지 않는다', async () => {
