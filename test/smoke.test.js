@@ -19,6 +19,17 @@ function problem(over) {
   }, over || {});
 }
 
+test('신규 학습 카드는 오늘 실제 배정 수를 분모로 사용한다', async () => {
+  const p1 = problem({ id: 'n1', createdAt: today(), attempts: [] });
+  const p2 = problem({ id: 'n2', createdAt: today(), attempts: [] });
+  const t = open({ storage: { problems: [p1, p2], books: [], insights: [], daily: {}, settings: { newGoal: 1 } } });
+  await t.tick();
+  const cards = [...t.d.querySelectorAll('.today-strip .tile')];
+  const card = cards.find((el) => el.textContent.includes('신규 학습'));
+  assert.ok(card, '신규 학습 카드가 있어야 한다');
+  assert.ok(card.textContent.includes('0/2'), '설정 목표가 아니라 오늘 실제 신규 2개가 분모여야 한다');
+});
+
 test('코스 6단계가 낮은 난이도부터 나온다', async () => {
   const t = open(); await t.tick();
   t.click('#nav button[data-v="pack"]'); await t.tick();
