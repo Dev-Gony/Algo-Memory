@@ -274,6 +274,9 @@ ol.guide li.on::before{background:var(--accent);border-color:transparent;color:v
 .dl.soft{opacity:.55}
 .dl mark{background:color-mix(in srgb, var(--bad) 28%, transparent);color:inherit;border-radius:3px;padding:0 1px}
 .dl.extra mark{background:color-mix(in srgb, var(--warn) 34%, transparent)}
+.run-preview{border:1px solid var(--line);border-radius:10px;background:var(--panel-2);padding:12px}
+.run-line{padding:7px 9px;border-radius:7px;background:var(--panel);border:1px solid var(--line);margin-top:6px;white-space:pre-wrap;word-break:break-word}
+.drill-complete{border-color:color-mix(in srgb, var(--good) 30%, var(--line))}
 .style-note{border-color:color-mix(in srgb, var(--accent) 24%, var(--line))}
 .style-list{display:grid;gap:7px}
 .style-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;font-family:var(--mono);font-size:12px}

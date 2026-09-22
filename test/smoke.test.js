@@ -90,6 +90,39 @@ test('한글 조합 중에는 커서가 흔들리지 않고 안내가 뜬다', a
   assert.ok(t.d.getElementById('traceWarn').textContent.includes('한글 입력 상태'));
 });
 
+test('받아쓰기에서도 Tab 키로 4칸 들여쓰기를 입력한다', async () => {
+  const code = 'def solve():\n    return 1';
+  const p = problem({ code, title: 'Tab 들여쓰기', demo: { label: '대표 실행 예시', lines: ['solve() → 1'] } });
+  const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="train"]'); await t.tick();
+
+  const ta = t.d.getElementById('tracein');
+  ta.value = 'def solve():\n';
+  ta.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  ta.dispatchEvent(new t.w.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+  assert.strictEqual(ta.value, 'def solve():\n    ', 'Tab 한 번이 4칸 들여쓰기로 들어가야 한다');
+});
+
+test('받아쓰기 완료 후 실행 결과를 보고 다음으로 넘어간다', async () => {
+  const p = problem({ demo: { label: '대표 실행 예시', lines: ['name → "gony"', 'age → 35'] } });
+  const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  t.click('#nav button[data-v="bank"]'); await t.tick();
+  t.click('.prow'); await t.tick();
+  t.click('.detail [data-act="train"]'); await t.tick();
+
+  await t.trace(CODE, { autoNext: false });
+  assert.strictEqual(t.view(), 'v-drill', '작성 직후 바로 다음 단계로 넘어가면 안 된다');
+  assert.ok(t.d.querySelector('.drill-complete'), '완료 결과 카드가 보여야 한다');
+  assert.ok(t.d.querySelector('.drill-complete').textContent.includes('name → "gony"'), '대표 실행 결과가 보여야 한다');
+
+  t.click('[data-act="drill-next"]'); await t.tick(60);
+  assert.strictEqual(t.view(), 'v-test', '결과를 확인한 뒤 다음 단계로 넘어간다');
+});
+
 test('한 번도 통과 못 한 문제는 깜지 다음에 설명 단계가 온다', async () => {
   const t = open({ storage: { problems: [problem()], books: [], insights: [], daily: {}, settings: {} } });
   await t.tick();

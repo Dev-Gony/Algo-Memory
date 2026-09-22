@@ -351,7 +351,18 @@ if __name__ == "__main__":
         shortest = min(len(c["code"].split("\n")) for c in codes)
         print("L%d %-7s %2d개 · 평균 %4.1f줄 · 최소 %d줄" % (lv, NAMES[lv], len(codes), avg, shortest))
 
-    out = [{k: v for k, v in i.items() if k != "_test"} for i in C]
+    import os
+    _demo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demos.json")
+    _demos = {}
+    if os.path.exists(_demo_path):
+        with open(_demo_path, "r", encoding="utf-8") as _f:
+            _demos = json.load(_f)
+    out = []
+    for i in C:
+        row = {k: v for k, v in i.items() if k != "_test"}
+        if i["id"] in _demos:
+            row["demo"] = _demos[i["id"]]
+        out.append(row)
     # 난이도 안에서는 작성 순서(= 배우는 순서)를 유지한다
     _pos = {it["id"]: k for k, it in enumerate(C)}
     out.sort(key=lambda x: (x["lv"], _pos[x["id"]]))

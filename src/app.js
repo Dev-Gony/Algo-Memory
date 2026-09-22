@@ -1740,6 +1740,16 @@ function viewTest() {
   return h;
 }
 
+function drillResultPreview(p) {
+  var d = p && p.demo;
+  if (!d || !d.lines || !d.lines.length) {
+    return '<div class="hintbox"><b>실행 결과</b><div class="small muted" style="margin-top:5px">이 패턴은 결과 예시를 준비 중입니다.</div></div>';
+  }
+  return '<div class="run-preview"><div class="small muted" style="margin-bottom:6px">' + esc(d.label || '대표 실행 결과') + '</div>' +
+    d.lines.map(function (line) { return '<div class="run-line mono">' + esc(line) + '</div>'; }).join('') +
+    '<div class="small muted" style="margin-top:8px">실전에서는 입력값에 따라 결과가 달라집니다. 여기서는 이 구현 패턴을 검증할 때 쓰는 대표 예시를 보여줍니다.</div></div>';
+}
+
 function viewDrill() {
   var dr = S.drill; if (!dr) return '';
   var p = S.problems.filter(function (x) { return x.id === dr.pid; })[0];
@@ -1762,7 +1772,7 @@ function viewDrill() {
     '<div class="editbar" style="margin:0 0 12px">' +
     '<span id="traceStat" class="mono">0%</span><span class="grow"></span>' +
     (dr.walk ? '<button class="btn sm ghost" data-act="drill-note">해설 ' + (dr.showNote ? '숨기기' : '보기') + '</button>' : '') +
-    '<span class="muted">들여쓰기는 자동으로 넘어갑니다 · 영문 입력 상태로</span></div>' +
+    '<span class="muted">Tab = 4칸 들여쓰기 · 영문 입력 상태로</span></div>' +
     (dr.walk && dr.showNote ? '<div class="hintbox" id="traceNote" style="margin-bottom:10px;min-height:66px"></div>' : '') +
     '<div class="hintbox" id="traceWarn" style="display:none;margin-bottom:10px"></div>' +
     '<div class="tracebox" id="tracebox" data-act="trace-focus">' +
@@ -1770,8 +1780,11 @@ function viewDrill() {
     '<textarea class="tracein" id="tracein" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off"></textarea>' +
     '</div>' +
     (dr.pos >= dr.target.length
-      ? '<div class="row" style="margin-top:14px"><button class="btn accent" data-act="drill-next">다음으로</button>' +
-        '<span class="small muted">다 채웠습니다</span></div>'
+      ? '<div class="drill-complete card pad" style="margin-top:14px">' +
+        '<div class="sect-h"><h2>작성 완료</h2><span class="sub">코드 흐름을 결과까지 연결해보세요</span></div>' +
+        drillResultPreview(p) +
+        '<div class="row" style="margin-top:14px"><button class="btn accent" data-act="drill-next">다음으로</button>' +
+        '<span class="small muted">결과를 확인한 뒤 다음 단계로 넘어갑니다.</span></div></div>'
       : '') +
     (window.innerWidth < 640
       ? '<div class="hintbox warn-ko" style="margin-top:12px;border-color:var(--warn);color:var(--warn);background:var(--warn-soft)">' +
@@ -2222,12 +2235,6 @@ function paintTrace() {
   }
 }
 
-function skipIndent() {
-  var dr = S.drill, t = dr.target;
-  while (dr.pos < t.length && (t[dr.pos] === ' ' || t[dr.pos] === '\t') &&
-    (dr.pos === 0 || t[dr.pos - 1] === '\n')) dr.pos++;
-}
-
 var HANGUL = /[\uac00-\ud7a3\u3131-\u318e]/;
 function traceInput() {
   var dr = S.drill; if (!dr) return;
@@ -2248,10 +2255,12 @@ function traceInput() {
   } else {
     reject(v.slice(pos));         /* IME 잔여물 등 — 제자리 유지 */
   }
-  skipIndent();
   ta.value = t.slice(0, dr.pos);
   paintTrace();
-  if (dr.pos >= t.length) finishPass();
+  if (dr.pos >= t.length) {
+    render();
+    return;
+  }
 }
 
 function reject(bad) {
@@ -2316,11 +2325,24 @@ function wireDrill() {
   });
   ta.addEventListener('input', traceInput);
   ta.addEventListener('keydown', function (e) {
-    if (e.key === 'Tab') { e.preventDefault(); }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (dr._ime || dr.pos >= dr.target.length) return;
+      var remain = dr.target.slice(dr.pos);
+      var n = 0;
+      while (n < 4 && remain[n] === ' ') n++;
+      if (n > 0) {
+        dr.pos += n;
+        ta.value = dr.target.slice(0, dr.pos);
+        paintTrace();
+      } else {
+        reject('Tab');
+        paintTrace();
+      }
+    }
   });
   paintTrace();
   ta.focus();
-  if (dr.pos >= dr.target.length) setTimeout(finishPass, 0);
 }
 
 function submitTest() {
