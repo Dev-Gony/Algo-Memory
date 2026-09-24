@@ -29,7 +29,7 @@ const neonProvider = esbuild.buildSync({
   target: ['es2020'],
   minify: true,
   logLevel: 'silent'
-}).outputFiles[0].text.trim();
+}).outputFiles[0].text.trim().replace(/<\/script/gi, '<\\/script');
 const cloudConfig = read('cloud-config.js').trim();
 const cloud = read('cloud.js').trim();
 
