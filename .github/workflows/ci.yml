@@ -21,6 +21,9 @@ jobs:
       - name: 생성된 카탈로그가 커밋본과 같은지
         run: git diff --exit-code src/catalog.json src/sql-catalog.json
 
+      - name: 문제 설명·스키마 콘텐츠 품질 검증
+        run: node test/content-eval.js
+
   app:
     name: 빌드 + 종단 테스트
     runs-on: ubuntu-latest
