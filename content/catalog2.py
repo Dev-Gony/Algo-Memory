@@ -196,7 +196,7 @@ def from_base(s, base):
 add("py-input", "파이썬 기본", "입력 받기 기본형",
     "개수, 한 줄 여러 수, 격자, 문자열 여러 줄을 읽는다.",
     "입력 100,000줄 이상이면 반드시 readline",
-    "실제 제출에서는 파일 맨 위에 input = sys.stdin.readline 한 줄을 넣는다. readline은 개행이 붙어 오므로 문자열은 rstrip()이 필수.",
+    "실제 제출에서는 파일 맨 위에 input = sys.stdin.readline 한 줄을 둘 수 있다. readline은 개행을 포함하므로 줄 전체 문자열을 그대로 쓸 때는 rstrip()으로 제거하고, split()이나 int()로 바로 파싱할 때는 생략해도 된다.",
     '''
 import sys
 
