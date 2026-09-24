@@ -196,6 +196,32 @@ test('복습 문제는 정답에서 요구하는 변수명을 명시한다', asy
   assert.ok(!cue.includes('7 + 3') && !cue.includes('10이 나온다') && !cue.includes('4가 나온다'), '정답 결과를 복습 문제에 노출하면 안 된다');
 });
 
+test('SQL 복습은 문제 설명과 사용 테이블 스키마를 함께 보여준다', async () => {
+  const p = problem({
+    id: 'sql1', srcId: 'sq-select', lang: 'sql', title: '조회의 기본형',
+    code: 'SELECT id, name, city\nFROM members\nORDER BY id;',
+    prompt: 'members 테이블에서 id, name, city를 조회하고 id 오름차순으로 정렬한다.',
+    tables: [{
+      name: 'members', label: '회원',
+      columns: [
+        { name: 'id', type: 'INTEGER', desc: '회원 번호' },
+        { name: 'name', type: 'TEXT', desc: '회원 이름' },
+        { name: 'city', type: 'TEXT', desc: '거주 도시' }
+      ]
+    }],
+    schedule: [{ round: 1, due: today(), done: false }]
+  });
+  const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: {} } });
+  await t.tick();
+  const review = [...t.d.querySelectorAll('[data-act="live"]')].find((el) => el.dataset.i === '0');
+  review.click(); await t.tick();
+  const cue = t.d.querySelector('.review-cue').textContent;
+  assert.ok(cue.includes('members 테이블'), 'SQL 문제에 사용할 테이블이 명시돼야 한다');
+  assert.ok(cue.includes('id 오름차순'), '정렬 요구사항이 명시돼야 한다');
+  assert.ok(cue.includes('회원 번호') && cue.includes('회원 이름') && cue.includes('거주 도시'),
+    'SQL 문제에 컬럼 설명이 보여야 한다');
+});
+
 test('수동 실전은 복습 단서를 보여주지 않는다', async () => {
   const p = problem({ brief: 'N까지의 합을 구한다.', logic: '반복문으로 누적합을 만든다.' });
   const t = open({ storage: { problems: [p], books: [], insights: [], daily: {}, settings: {} } });
