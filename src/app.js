@@ -1703,20 +1703,37 @@ function reviewRequirements(p) {
   return out.length ? out : ['문제의 요구사항을 만족하는 코드를 작성한다.'];
 }
 function reviewCue(p) {
+  var isSql = (p.lang || 'python') === 'sql';
   var req = reviewRequirements(p);
   var names = requiredNames(p);
   var h = '<div class="card pad review-cue" style="margin-bottom:12px">' +
-    '<div class="sect-h"><h2 style="font-size:14px">복습 문제</h2><span class="sub">정답 코드는 숨김</span></div>' +
-    '<p class="small muted review-intro">아래 요구사항을 순서대로 만족하는 코드를 작성하세요.' +
-    (names.length ? ' 표시된 변수명·함수명은 그대로 사용합니다.' : '') + '</p>';
-  if (names.length) {
-    h += '<div class="required-names"><span class="small muted">사용할 이름</span>' +
-      names.map(function (x) { return '<code>' + esc(x) + '</code>'; }).join('') + '</div>';
+    '<div class="sect-h"><h2 style="font-size:14px">복습 문제</h2><span class="sub">정답 코드는 숨김</span></div>';
+
+  if (isSql && p.prompt) {
+    h += '<div class="review-problem-text">' + esc(p.prompt) + '</div>';
+    if (p.tables && p.tables.length) {
+      h += '<div class="sql-schema-wrap"><div class="small muted">사용 테이블</div>' +
+        p.tables.map(function (t) {
+          return '<div class="sql-schema"><div class="sql-schema-title"><code>' + esc(t.name) + '</code> · ' + esc(t.label || '') + '</div>' +
+            '<div class="sql-cols">' + (t.columns || []).map(function (c) {
+              return '<div><code>' + esc(c.name) + '</code><span>' + esc(c.type || '') + '</span><em>' + esc(c.desc || '') + '</em></div>';
+            }).join('') + '</div></div>';
+        }).join('') + '</div>';
+    }
+    h += '<p class="small muted review-intro">위 조건을 만족하는 SQL을 작성하세요.</p>';
+  } else {
+    h += '<p class="small muted review-intro">아래 요구사항을 순서대로 만족하는 코드를 작성하세요.' +
+      (names.length ? ' 표시된 변수명·함수명은 그대로 사용합니다.' : '') + '</p>';
+    if (names.length) {
+      h += '<div class="required-names"><span class="small muted">사용할 이름</span>' +
+        names.map(function (x) { return '<code>' + esc(x) + '</code>'; }).join('') + '</div>';
+    }
+    h += '<ol class="review-requirements">' +
+      req.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') +
+      '</ol>';
   }
-  h += '<ol class="review-requirements">' +
-    req.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') +
-    '</ol></div>';
-  return h;
+
+  return h + '</div>';
 }
 
 function viewTest() {
