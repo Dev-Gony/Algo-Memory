@@ -122,3 +122,21 @@ Neon 장애 또는 Auth 호환성 문제 발생 시:
 4. localStorage는 삭제하지 않는다.
 
 local-first 구조 덕분에 클라우드 공급자 전환이 학습 자체를 막지 않도록 한다.
+
+
+## 8. 2026-09-24 전환 완료
+
+실사용 검증에서 다음 항목을 확인했다.
+
+- Neon Auth 회원가입 및 이메일 인증
+- 새로고침 후 세션 유지
+- `public.user_state` 저장
+- 학습 기록 변경 후 새로고침 복원
+- GitHub Pages 배포 성공
+
+기본 클라우드 공급자는 Neon으로 전환한다.
+
+- 기본 주소: `https://algo.devgony.com/` → Neon
+- 긴급 롤백 주소: `https://algo.devgony.com/?cloud=supabase` → 기존 Supabase
+
+Supabase 프로젝트는 삭제하지 않고 pause 상태로 유지한다. 롤백이 필요한 경우 Supabase를 restore한 뒤 `?cloud=supabase`로 기능을 확인한다.
