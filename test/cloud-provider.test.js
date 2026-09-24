@@ -54,6 +54,8 @@ function load(overrides = {}) {
 
 assert.match(code, /provider\.resetPassword/, 'password reset must be provider-overridable');
 assert.match(code, /provider\.changePassword/, 'password change must be provider-overridable');
+assert.match(code, /provider\.completePasswordReset/, 'OTP password reset must be provider-overridable');
+assert.match(code, /data-auth="reset-code"/, 'OTP reset UI must be present');
 assert.match(code, /createCloudClient\(\)/, 'client creation must go through the provider boundary');
 
 console.log('  ✓ cloud provider compatibility');
