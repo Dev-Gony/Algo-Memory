@@ -2,7 +2,7 @@ name: Neon migration readiness
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, codex/neon-migration-readiness]
     paths:
       - 'scripts/neon-migration.cjs'
       - 'test/neon-*'
