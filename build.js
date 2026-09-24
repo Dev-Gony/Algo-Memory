@@ -41,15 +41,14 @@ if (!js.includes(marker)) {
 js = js.replace(marker, JSON.stringify(catalog));
 
 let html = read('index.html');
+if (!html.includes('<!--INJECT:STYLES-->') || !html.includes('<!--INJECT:SCRIPT-->')) {
+  console.error('필수 빌드 자리표시자가 없습니다.');
+  process.exit(1);
+}
 html = html
   .replace(/<!--DEV-->[\s\S]*?<!--\/DEV-->\s*/g, '')
   .replace('<!--INJECT:STYLES-->', '<style>\n' + css + '\n</style>')
   .replace('<!--INJECT:SCRIPT-->', '<script>\n' + neonConfig + '\n</script>\n<script>\n' + neonProvider + '\n</script>\n<script>\n' + cloudConfig + '\n</script>\n<script>\n' + cloud + '\n</script>\n<script>\n' + js + '\n</script>');
-
-if (html.includes('<!--INJECT:STYLES-->') || html.includes('<!--INJECT:SCRIPT-->')) {
-  console.error('치환되지 않은 빌드 자리표시자가 남았습니다.');
-  process.exit(1);
-}
 
 fs.mkdirSync(DIST, { recursive: true });
 fs.writeFileSync(OUT, html, 'utf8');
