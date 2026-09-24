@@ -70,9 +70,11 @@ Python 70개와 MySQL 기준 SQL 35개, 총 105개 템플릿을 난이도별로 
 src/index.html      Application shell
 src/styles.css      Design tokens and styles
 src/app.js          State, scoring engine, and views
-src/cloud.js        Optional account auth and cloud sync
-src/cloud-config.js Supabase public configuration
-src/catalog.json    Generated Python template catalog
+src/cloud.js         Optional account auth and cloud sync
+src/neon-config.js    Neon Auth / Data API public endpoints
+src/neon-provider.js  Neon cloud provider
+src/cloud-config.js   Legacy Supabase rollback configuration
+src/catalog.json      Generated Python template catalog
 content/            Template sources and validation scripts
 test/               jsdom end-to-end tests
 dist/               Single-file deployment output
@@ -88,7 +90,9 @@ dist/               Single-file deployment output
 - Python
 - SQLite (SQL 템플릿 검증)
 - GitHub Actions
-- Supabase Auth + Postgres (optional account sync)
+- Neon Auth + Data API (optional account sync)
+- GitHub Pages
+- Supabase (paused rollback backend only)
 
 ## Development
 
@@ -103,13 +107,14 @@ npm run catalog   # 105개 템플릿 검증 후 카탈로그 생성
 ## Data Storage
 
 - 로그인하지 않은 사용자는 브라우저 `localStorage`에 학습 기록을 저장합니다.
-- Supabase가 연결된 웹 배포에서는 이메일·비밀번호 계정을 선택적으로 사용할 수 있습니다.
+- 운영 웹 배포에서는 Neon Auth + Data API를 기본 클라우드 백엔드로 사용합니다.
 - 로그인한 사용자는 로컬 저장을 유지하면서 동일한 학습 상태를 계정에도 동기화합니다.
 - 최초 가입 시 클라우드 기록이 없으면 현재 브라우저 학습 기록을 계정에 업로드합니다.
-- 사용자별 클라우드 데이터는 Row Level Security로 본인 계정에만 접근할 수 있도록 설계했습니다.
+- 사용자별 클라우드 데이터는 RLS로 본인 계정에만 접근할 수 있도록 설계했습니다.
+- 기존 Supabase 프로젝트는 삭제하지 않고 pause 상태의 롤백 백엔드로만 유지합니다.
 - Claude Artifact 환경의 기존 계정 저장소 지원도 유지합니다.
 
-계정 동기화 설정 절차는 [docs/account-sync.md](docs/account-sync.md)에 정리했습니다. 저장 실패가 학습 흐름 자체를 막지 않도록 local-first 방식으로 구성했습니다.
+계정 동기화 설정 절차는 [docs/account-sync.md](docs/account-sync.md), Neon 이전/롤백 절차는 [docs/NEON_MIGRATION.md](docs/NEON_MIGRATION.md)에 정리했습니다. 저장 실패가 학습 흐름 자체를 막지 않도록 local-first 방식으로 구성했습니다.
 
 ## Design Decisions
 
@@ -125,7 +130,17 @@ npm run catalog   # 105개 템플릿 검증 후 카탈로그 생성
 - 단계형 코드 재현 학습과 평가 로직 구현
 - 복습 스케줄, 코스, 통계, 예시 데이터 제공
 - 단일 HTML 배포 산출물 생성 지원
-- 선택적 이메일 계정 및 학습 기록 클라우드 동기화 코드 구현 (Supabase 프로젝트 연결 필요)
+- Neon 기반 이메일 계정 및 학습 기록 클라우드 동기화 운영
+- GitHub Pages 자동 배포
+- Supabase 프로젝트는 롤백용으로 pause 상태 유지
+
+## Deployment
+
+- Production: https://algo.devgony.com/
+- Frontend hosting: GitHub Pages
+- Cloud auth / data: Neon
+- Build/deploy: GitHub Actions
+- Vercel is not used for the production deployment.
 
 ## License
 
