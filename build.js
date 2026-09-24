@@ -6,6 +6,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const esbuild = require('esbuild');
 
 const SRC = path.join(__dirname, 'src');
 const DIST = path.join(__dirname, 'dist');
@@ -18,6 +19,17 @@ const pyCatalog = JSON.parse(read('catalog.json')).map((c) => Object.assign({ la
 const sqlCatalog = JSON.parse(read('sql-catalog.json')).map((c) => Object.assign({ lang: 'sql' }, c));
 const catalog = pyCatalog.concat(sqlCatalog);
 let js = read('app.js').trim();
+const neonConfig = read('neon-config.js').trim();
+const neonProvider = esbuild.buildSync({
+  entryPoints: [path.join(SRC, 'neon-provider.js')],
+  bundle: true,
+  write: false,
+  platform: 'browser',
+  format: 'iife',
+  target: ['es2020'],
+  minify: true,
+  logLevel: 'silent'
+}).outputFiles[0].text.trim();
 const cloudConfig = read('cloud-config.js').trim();
 const cloud = read('cloud.js').trim();
 
@@ -32,7 +44,7 @@ let html = read('index.html');
 html = html
   .replace(/<!--DEV-->[\s\S]*?<!--\/DEV-->\s*/g, '')
   .replace('<!--INJECT:STYLES-->', '<style>\n' + css + '\n</style>')
-  .replace('<!--INJECT:SCRIPT-->', '<script>\n' + cloudConfig + '\n</script>\n<script>\n' + cloud + '\n</script>\n<script>\n' + js + '\n</script>');
+  .replace('<!--INJECT:SCRIPT-->', '<script>\n' + neonConfig + '\n</script>\n<script>\n' + neonProvider + '\n</script>\n<script>\n' + cloudConfig + '\n</script>\n<script>\n' + cloud + '\n</script>\n<script>\n' + js + '\n</script>');
 
 if (html.includes('<!--INJECT:')) {
   console.error('치환되지 않은 자리표시자가 남았습니다.');
