@@ -1,7 +1,8 @@
 (function () {
 'use strict';
 
-var provider = window.ALGO_MEMORY_CLOUD_PROVIDER || {};\nvar cfg = window.ALGO_MEMORY_SUPABASE || {};
+var provider = window.ALGO_MEMORY_CLOUD_PROVIDER || {};
+var cfg = window.ALGO_MEMORY_SUPABASE || {};
 var app = null;
 var client = null;
 var session = null;
