@@ -5,14 +5,14 @@ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
   var cfg = window.ALGO_MEMORY_NEON || {};
   var params = new URLSearchParams(window.location.search || '');
-  if (params.get('cloud') !== 'neon') return;
+  if (params.get('cloud') === 'supabase') return;
 
   function errorOf(result) {
     return result && result.error ? result.error : null;
   }
 
   window.ALGO_MEMORY_CLOUD_PROVIDER = {
-    name: 'neon-shadow',
+    name: 'neon',
     configured: function () {
       return !!(cfg.authUrl && cfg.dataApiUrl);
     },
