@@ -13,7 +13,8 @@ const cloud = fs.readFileSync('src/cloud.js', 'utf8');
 const migration = fs.readFileSync('docs/NEON_MIGRATION.md', 'utf8');
 
 must(schema, /enable row level security/i, 'Neon user_state must enable RLS');
-must(schema, /auth\.uid\(\)\s*=\s*user_id/i, 'RLS must bind rows to auth.uid()');
+must(schema, /auth\.user_id\(\)\s*=\s*user_id/i, 'RLS must bind rows to auth.user_id()');
+must(schema, /user_id\s+text\s+primary key/i, 'Neon Auth user IDs must be stored as text');
 must(schema, /to authenticated/i, 'policies/grants must target authenticated users');
 must(cloud, /ALGO_MEMORY_CLOUD_PROVIDER/, 'cloud provider seam must exist');
 must(cloud, /provider\.changePassword/, 'password change must be provider-specific');

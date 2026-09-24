@@ -45,15 +45,15 @@ ChatGPT의 현재 Neon 연결은 기존 Re:Place 프로젝트 범위라 새 프�
 
 ## 2. Neon DB 스키마
 
-새 프로젝트에서 `neon/schema.sql`을 적용한다.
+새 프로젝트에서 `neon/schema.sql`을 적용한다. Neon Managed Better Auth의 기본 사용자 ID는 text이므로 `auth.user_id()`를 사용한다. `auth.uid()`는 UUID형 `sub`일 때만 사용한다.
 
 설계 원칙:
 
-- `user_id uuid primary key`
+- `user_id text primary key`
 - 앱 상태는 `jsonb`
 - RLS 활성화
 - `authenticated`만 읽기/쓰기
-- 모든 정책은 `auth.uid() = user_id`
+- 모든 정책은 `auth.user_id() = user_id`
 - Neon Auth 내부 테이블에 직접 FK를 걸지 않는다. Managed Auth 구현 세부사항과 앱 데이터를 느슨하게 결합한다.
 
 ## 3. 애플리케이션 전환 방식
