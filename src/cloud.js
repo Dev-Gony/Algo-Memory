@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 
-var cfg = window.ALGO_MEMORY_SUPABASE || {};
+var provider = window.ALGO_MEMORY_CLOUD_PROVIDER || {};\nvar cfg = window.ALGO_MEMORY_SUPABASE || {};
 var app = null;
 var client = null;
 var session = null;
@@ -9,7 +9,26 @@ var timer = null;
 var pendingSignupEmail = '';
 
 function configured() {
+  if (typeof provider.configured === 'function') return !!provider.configured();
   return !!(cfg.url && cfg.publishableKey && window.supabase && window.supabase.createClient);
+}
+function createCloudClient() {
+  if (typeof provider.createClient === 'function') return provider.createClient();
+  return window.supabase.createClient(cfg.url, cfg.publishableKey, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+}
+async function requestPasswordReset(email, redirectTo) {
+  if (typeof provider.resetPassword === 'function') {
+    return provider.resetPassword(client, email, redirectTo);
+  }
+  return client.auth.resetPasswordForEmail(email, { redirectTo: redirectTo });
+}
+async function changePassword(nextPassword) {
+  if (typeof provider.changePassword === 'function') {
+    return provider.changePassword(client, nextPassword);
+  }
+  return client.auth.updateUser({ password: nextPassword });
 }
 function getApp() { return window.AlgoMemoryApp || app; }
 function setStatus(mode, email) {
@@ -173,14 +192,14 @@ async function act(name) {
     }
     if (name === 'reset') {
       var re=value('auth-email'); if(!re) throw new Error('이메일을 입력하세요.');
-      var pr=await client.auth.resetPasswordForEmail(re,{redirectTo:location.origin + location.pathname}); if(pr.error) throw pr.error;
+      var pr=await requestPasswordReset(re, location.origin + location.pathname); if(pr.error) throw pr.error;
       if(app&&app.toast) app.toast('비밀번호 재설정 메일을 보냈습니다'); close(); return;
     }
     if (name === 'update-password') {
       var np=value('auth-password'), np2=value('auth-password2');
       if (np.length < 8) throw new Error('비밀번호는 8자 이상으로 설정해 주세요.');
       if (np !== np2) throw new Error('비밀번호 확인이 일치하지 않습니다.');
-      var up=await client.auth.updateUser({password:np}); if(up.error) throw up.error;
+      var up=await changePassword(np); if(up.error) throw up.error;
       close(); if(app&&app.toast) app.toast('비밀번호를 변경했습니다'); return;
     }
   } catch (e) {
@@ -191,9 +210,7 @@ async function init() {
   app = getApp();
   setStatus('local');
   if (!configured()) return;
-  client = window.supabase.createClient(cfg.url, cfg.publishableKey, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-  });
+  client = createCloudClient();
   var r = await client.auth.getSession();
   if (!r.error) await adoptSession(r.data.session);
   client.auth.onAuthStateChange(function (event, next) {
