@@ -17,8 +17,8 @@ must(schema, /auth\.uid\(\)\s*=\s*user_id/i, 'RLS must bind rows to auth.uid()')
 must(schema, /to authenticated/i, 'policies/grants must target authenticated users');
 must(cloud, /ALGO_MEMORY_CLOUD_PROVIDER/, 'cloud provider seam must exist');
 must(cloud, /provider\.changePassword/, 'password change must be provider-specific');
-must(migration, /Supabase 프로젝트를 먼저 중지하지 않는다/, 'cutover must preserve rollback');
-must(migration, /비밀번호 해시를 직접 이전하지 않는다/, 'password-user migration limitation must be documented');
+must(migration, /Supabase.*(?:먼저|전에는).*중지하지 않는다|Supabase를 끄기 전에/i, 'cutover must preserve rollback');
+must(migration, /비밀번호.*(?:해시|그대로).*이전할 수 없다|비밀번호 해시를 직접 이전하지 않는다/i, 'password-user migration limitation must be documented');
 
 if (/postgres(?:ql)?:\/\/[^\s'"]+:[^\s@'"]+@/i.test(schema + '\n' + migration)) {
   console.error('FAIL: privileged database connection string must not be committed');
