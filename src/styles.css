@@ -287,6 +287,16 @@ ol.guide li.on::before{background:var(--accent);border-color:transparent;color:v
 .required-names code{font-family:var(--mono);font-size:12px;padding:4px 7px;border:1px solid var(--line);border-radius:7px;background:var(--panel)}
 .review-requirements{margin:0;padding-left:22px;line-height:1.7}
 .review-requirements li + li{margin-top:4px}
+.review-problem-text{font-size:14px;line-height:1.75;margin:0 0 14px;color:var(--ink)}
+.sql-schema-wrap{display:grid;gap:10px;margin:0 0 12px}
+.sql-schema{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+.sql-schema-title{padding:9px 11px;border-bottom:1px solid var(--line);font-weight:700}
+.sql-cols{display:grid}
+.sql-cols>div{display:grid;grid-template-columns:120px 80px minmax(0,1fr);gap:10px;padding:7px 11px;border-top:1px solid var(--line)}
+.sql-cols>div:first-child{border-top:0}
+.sql-cols code{font-family:var(--mono);font-size:12px}
+.sql-cols span{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.sql-cols em{font-style:normal;font-size:12px;color:var(--ink-2)}
 .style-note{border-color:color-mix(in srgb, var(--accent) 24%, var(--line))}
 .style-list{display:grid;gap:7px}
 .style-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;font-family:var(--mono);font-size:12px}
