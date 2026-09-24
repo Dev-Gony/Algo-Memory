@@ -29,7 +29,7 @@ const neonProvider = esbuild.buildSync({
   target: ['es2020'],
   minify: true,
   logLevel: 'silent'
-}).outputFiles[0].text.trim().replace(/<\/script/gi, '<\\/script');
+}).outputFiles[0].text.trim();
 const cloudConfig = read('cloud-config.js').trim();
 const cloud = read('cloud.js').trim();
 
@@ -48,12 +48,13 @@ if (!html.includes('<!--INJECT:STYLES-->') || !html.includes('<!--INJECT:SCRIPT-
 html = html
   .replace(/<!--DEV-->[\s\S]*?<!--\/DEV-->\s*/g, '')
   .replace('<!--INJECT:STYLES-->', '<style>\n' + css + '\n</style>')
-  .replace('<!--INJECT:SCRIPT-->', '<script>\n' + neonConfig + '\n</script>\n<script>\n' + neonProvider + '\n</script>\n<script>\n' + cloudConfig + '\n</script>\n<script>\n' + cloud + '\n</script>\n<script>\n' + js + '\n</script>');
+  .replace('<!--INJECT:SCRIPT-->', '<script>\n' + neonConfig + '\n</script>\n<script src="./neon-provider.js"></script>\n<script>\n' + cloudConfig + '\n</script>\n<script>\n' + cloud + '\n</script>\n<script>\n' + js + '\n</script>');
 
 fs.mkdirSync(DIST, { recursive: true });
 fs.writeFileSync(OUT, html, 'utf8');
 // 깃허브 페이지 루트용
 fs.writeFileSync(path.join(DIST, 'index.html'), html, 'utf8');
+fs.writeFileSync(path.join(DIST, 'neon-provider.js'), neonProvider + '\n', 'utf8');
 fs.writeFileSync(path.join(DIST, '.nojekyll'), '');
 
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
