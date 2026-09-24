@@ -8,6 +8,7 @@ var client = null;
 var session = null;
 var timer = null;
 var pendingSignupEmail = '';
+var pendingResetEmail = '';
 
 function configured() {
   if (typeof provider.configured === 'function') return !!provider.configured();
@@ -30,6 +31,12 @@ async function changePassword(nextPassword) {
     return provider.changePassword(client, nextPassword);
   }
   return client.auth.updateUser({ password: nextPassword });
+}
+async function completePasswordReset(email, code, nextPassword) {
+  if (typeof provider.completePasswordReset !== 'function') {
+    return { data: null, error: new Error('인증번호 방식의 비밀번호 재설정을 지원하지 않습니다.') };
+  }
+  return provider.completePasswordReset(client, email, code, nextPassword);
 }
 function getApp() { return window.AlgoMemoryApp || app; }
 function setStatus(mode, email) {
@@ -134,9 +141,18 @@ function verifyView(email) {
     '<button class="btn" data-auth="resend">인증번호 다시 보내기</button></div>'));
 }
 function resetView() {
-  show(shell('비밀번호 재설정', '<p class="small muted">가입한 이메일로 비밀번호 재설정 링크를 보냅니다.</p>' +
+  show(shell('비밀번호 재설정', '<p class="small muted">가입한 이메일로 비밀번호 재설정 안내를 보냅니다.</p>' +
     field('이메일','auth-email','email','email') +
-    '<div class="row"><button class="btn accent" data-auth="reset">재설정 메일 보내기</button>' +
+    '<div class="row"><button class="btn accent" data-auth="reset">재설정 요청</button>' +
+    '<button class="btn" data-auth="login-view">로그인으로</button></div>'));
+}
+function resetCodeView(email) {
+  pendingResetEmail = email || pendingResetEmail;
+  show(shell('비밀번호 재설정', '<p class="auth-desc"><b>' + esc(pendingResetEmail) + '</b>으로 보낸 인증번호와 새 비밀번호를 입력하세요.</p>' +
+    '<label class="f"><span>인증번호</span><input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="인증번호 입력"></label>' +
+    field('새 비밀번호','auth-password','password','new-password') +
+    field('새 비밀번호 확인','auth-password2','password','new-password') +
+    '<div class="row"><button class="btn accent" data-auth="reset-code">비밀번호 변경</button>' +
     '<button class="btn" data-auth="login-view">로그인으로</button></div>'));
 }
 function updatePasswordView() {
@@ -194,7 +210,20 @@ async function act(name) {
     if (name === 'reset') {
       var re=value('auth-email'); if(!re) throw new Error('이메일을 입력하세요.');
       var pr=await requestPasswordReset(re, location.origin + location.pathname); if(pr.error) throw pr.error;
+      if (pr.data && pr.data.requiresOtp) {
+        resetCodeView(re);
+        if(app&&app.toast) app.toast('비밀번호 재설정 인증번호를 보냈습니다');
+        return;
+      }
       if(app&&app.toast) app.toast('비밀번호 재설정 메일을 보냈습니다'); close(); return;
+    }
+    if (name === 'reset-code') {
+      var rc=value('auth-code'), rpw=value('auth-password'), rpw2=value('auth-password2');
+      if (!/^\d{6,10}$/.test(rc)) throw new Error('이메일로 받은 숫자 인증번호를 입력하세요.');
+      if (rpw.length < 8) throw new Error('비밀번호는 8자 이상으로 설정해 주세요.');
+      if (rpw !== rpw2) throw new Error('비밀번호 확인이 일치하지 않습니다.');
+      var done=await completePasswordReset(pendingResetEmail,rc,rpw); if(done.error) throw done.error;
+      close(); if(app&&app.toast) app.toast('비밀번호를 변경했습니다. 새 비밀번호로 로그인하세요'); return;
     }
     if (name === 'update-password') {
       var np=value('auth-password'), np2=value('auth-password2');
