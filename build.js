@@ -2,7 +2,7 @@
 /**
  * src/ 의 조각들을 dist/algo-memory.html 하나로 합친다.
  * 배포 대상은 항상 이 단일 파일이다. 앱 CSS·JS·문제 데이터는 인라인하고,
- * 웹 배포에서는 Google Fonts와 Supabase JS SDK를 외부에서 불러온다.
+ * 웹 배포에서는 Google Fonts와 Supabase JS SDK를 외부에서 불러오고, Neon SDK는 빌드 시 번들한다.
  */
 const fs = require('fs');
 const path = require('path');
@@ -46,8 +46,8 @@ html = html
   .replace('<!--INJECT:STYLES-->', '<style>\n' + css + '\n</style>')
   .replace('<!--INJECT:SCRIPT-->', '<script>\n' + neonConfig + '\n</script>\n<script>\n' + neonProvider + '\n</script>\n<script>\n' + cloudConfig + '\n</script>\n<script>\n' + cloud + '\n</script>\n<script>\n' + js + '\n</script>');
 
-if (html.includes('<!--INJECT:')) {
-  console.error('치환되지 않은 자리표시자가 남았습니다.');
+if (html.includes('<!--INJECT:STYLES-->') || html.includes('<!--INJECT:SCRIPT-->')) {
+  console.error('치환되지 않은 빌드 자리표시자가 남았습니다.');
   process.exit(1);
 }
 
