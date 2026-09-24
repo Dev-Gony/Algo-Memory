@@ -5,3 +5,10 @@ __pycache__/
 .vscode/
 .idea/
 *.log
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+.migration-backups/
+.wrangler/
