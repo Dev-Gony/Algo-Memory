@@ -1,0 +1,36 @@
+name: Neon migration readiness
+
+on:
+  pull_request:
+    paths:
+      - 'src/cloud.js'
+      - 'neon/**'
+      - 'docs/NEON_MIGRATION.md'
+      - 'docs/account-sync.md'
+      - 'scripts/check-neon-migration.js'
+      - 'test/cloud-provider.test.js'
+      - 'package.json'
+      - '.github/workflows/neon-migration-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/cloud.js'
+      - 'neon/**'
+      - 'docs/NEON_MIGRATION.md'
+      - 'scripts/check-neon-migration.js'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      - run: node scripts/check-neon-migration.js
+      - run: npm test
