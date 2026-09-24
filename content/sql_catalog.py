@@ -2,6 +2,8 @@
 """SQL 템플릿. 외울 코드는 MySQL 기준(프로그래머스가 MySQL)으로 쓰고,
 SQLite 에서 안 돌아가는 방언만 verify 로 변환본을 둬서 전부 실행 검증한다."""
 
+import re
+
 SCHEMA = """
 CREATE TABLE members (
     id INTEGER PRIMARY KEY, name TEXT, city TEXT, joined TEXT, age INTEGER
@@ -40,14 +42,99 @@ INSERT INTO orders VALUES
  (10,5,4,1,'2026-03-20','완료');
 """
 
+TABLE_META = {
+    "members": {
+        "name": "members", "label": "회원",
+        "columns": [
+            {"name": "id", "type": "INTEGER", "desc": "회원 번호"},
+            {"name": "name", "type": "TEXT", "desc": "회원 이름"},
+            {"name": "city", "type": "TEXT", "desc": "거주 도시"},
+            {"name": "joined", "type": "TEXT", "desc": "가입일 (YYYY-MM-DD)"},
+            {"name": "age", "type": "INTEGER", "desc": "나이, 미입력 시 NULL"},
+        ],
+    },
+    "products": {
+        "name": "products", "label": "상품",
+        "columns": [
+            {"name": "id", "type": "INTEGER", "desc": "상품 번호"},
+            {"name": "name", "type": "TEXT", "desc": "상품 이름"},
+            {"name": "category", "type": "TEXT", "desc": "카테고리"},
+            {"name": "price", "type": "INTEGER", "desc": "가격"},
+        ],
+    },
+    "orders": {
+        "name": "orders", "label": "주문",
+        "columns": [
+            {"name": "id", "type": "INTEGER", "desc": "주문 번호"},
+            {"name": "member_id", "type": "INTEGER", "desc": "회원 번호 (members.id)"},
+            {"name": "product_id", "type": "INTEGER", "desc": "상품 번호 (products.id)"},
+            {"name": "amount", "type": "INTEGER", "desc": "주문 수량"},
+            {"name": "ordered_at", "type": "TEXT", "desc": "주문일 (YYYY-MM-DD)"},
+            {"name": "status", "type": "TEXT", "desc": "주문 상태: 완료/취소/대기"},
+        ],
+    },
+}
+
+PROMPTS = {
+    "sq-select": "members 테이블에서 id, name, city를 조회하고 id 오름차순으로 정렬한다.",
+    "sq-where": "members 테이블에서 city가 '서울'인 회원의 name, age를 조회하고 id 오름차순으로 정렬한다.",
+    "sq-and-or": "products 테이블에서 category가 '전자'이고 price가 30000 이상 100000 이하인 상품의 name, price를 조회해 price 오름차순으로 정렬한다.",
+    "sq-order-limit": "products 테이블에서 name, price를 조회하고 price 내림차순으로 정렬한 뒤 상위 3개만 조회한다.",
+    "sq-alias": "products 테이블의 '생활' 카테고리 상품을 대상으로 name을 상품명, price를 정가, price의 90%를 할인가로 조회하고 price 오름차순으로 정렬한다.",
+    "sq-null": "members 테이블에서 age가 NULL이거나 30 이상인 회원을 조회한다. NULL인 age는 0으로 표시하고 name, age를 id 오름차순으로 정렬한다.",
+    "sq-like": "products 테이블에서 name이 '마' 또는 '모'로 시작하는 상품의 name, category를 조회하고 id 오름차순으로 정렬한다.",
+    "sq-distinct": "members 테이블의 city 값을 중복 없이 조회하고 city 오름차순으로 정렬한다.",
+    "sq-count": "members 테이블에서 전체 회원 수를 전체라는 이름으로, age가 NULL이 아닌 회원 수를 나이있음이라는 이름으로 한 행에 조회한다.",
+    "sq-agg": "orders 테이블에서 status가 '완료'인 주문만 대상으로 amount의 합계, 평균, 최댓값을 각각 총수량, 평균수량, 최대수량으로 조회한다.",
+    "sq-group": "products 테이블을 category별로 묶어 상품 개수와 평균 price를 각각 개수, 평균가격으로 조회하고 category 오름차순으로 정렬한다.",
+    "sq-having": "orders 테이블에서 status가 '완료'인 주문만 대상으로 member_id별 주문 수를 세고, 완료 주문이 3건 이상인 회원만 남겨 주문수 내림차순으로 정렬한다.",
+    "sq-case": "products 테이블에서 각 상품의 name과 가격대를 조회한다. price가 100000 이상이면 '고가', 30000 이상이면 '중가', 그 외에는 '저가'로 분류하고 price 내림차순으로 정렬한다.",
+    "sq-cond-agg": "products 테이블을 category별로 묶어 price가 50000 이상인 상품 수를 고가수로, 전체 상품 수를 전체로 조회하고 category 오름차순으로 정렬한다.",
+    "sq-join": "orders, members, products 테이블을 조인해 status가 '완료'인 주문의 회원 이름, 상품 이름, 주문 수량을 조회하고 주문 id 오름차순으로 정렬한다.",
+    "sq-left-join": "members와 orders를 LEFT JOIN해 주문이 한 건도 없는 회원까지 포함한다. 회원별 주문 수를 세고 주문수 내림차순, 같은 경우 회원 이름 오름차순으로 정렬한다.",
+    "sq-join-agg": "orders와 products를 조인해 status가 '완료'인 주문만 대상으로 category별 판매 수량 합계를 구하고 판매수량 내림차순으로 정렬한다.",
+    "sq-date": "orders 테이블의 ordered_at을 YYYY-MM 형식의 월로 변환해 월별 주문 수를 집계하고 월 오름차순으로 정렬한다.",
+    "sq-string": "members 테이블에서 id가 앞선 3명의 name, 성 한 글자, 이름 글자 수를 조회한다. 성은 name의 첫 글자, 글자 수는 CHAR_LENGTH로 계산한다.",
+    "sq-in": "products 테이블에서 category가 '전자' 또는 '생활'인 상품 중 id가 3, 4가 아닌 상품의 name, category를 조회하고 id 오름차순으로 정렬한다.",
+    "sq-sub-where": "products 테이블의 전체 평균 price보다 비싼 상품의 name, price를 조회하고 price 내림차순으로 정렬한다.",
+    "sq-sub-in": "orders 테이블에서 status가 '취소'인 주문을 한 번이라도 가진 회원을 찾아 members 테이블의 name을 조회하고 name 오름차순으로 정렬한다.",
+    "sq-exists": "members 테이블에서 orders에 주문 기록이 한 건도 없는 회원의 name을 조회하고 name 오름차순으로 정렬한다.",
+    "sq-sub-from": "products 테이블에서 category별 평균 price를 구한 뒤 평균이 10000 이상인 category와 평균을 조회하고 평균 내림차순으로 정렬한다.",
+    "sq-self-join": "members 테이블을 자기 자신과 조인해 같은 city에 사는 서로 다른 회원 쌍을 한 번씩만 조회한다. 회원1, 회원2, city를 출력하고 회원 id 순으로 정렬한다.",
+    "sq-union": "members에서 city가 '대구'인 회원과 products에서 price가 5000 미만인 상품을 name, 구분 형식으로 합친다. 회원은 '회원', 상품은 '상품'으로 표시하고 구분, name 순으로 정렬한다.",
+    "sq-rank": "products 테이블에서 name, price와 price 내림차순 기준 순위를 RANK로 계산해 순위라는 이름으로 조회하고 price 내림차순으로 정렬한다.",
+    "sq-partition": "products 테이블에서 category별로 price가 높은 순서대로 ROW_NUMBER를 매겨 순번으로 표시하고 category, name, price, 순번을 category와 순번 오름차순으로 조회한다.",
+    "sq-running-sum": "orders 테이블에서 status가 '완료'인 주문만 대상으로 ordered_at, amount와 날짜·id 순 누적 amount를 누적이라는 이름으로 조회한다.",
+    "sq-lag": "orders 테이블에서 status가 '완료'인 주문을 날짜·id 순으로 놓고 각 주문의 amount, 이전 주문의 amount, 현재와 이전의 차이를 각각 이전수량, 증감으로 조회한다.",
+    "sq-cte": "orders 테이블에서 완료 주문의 member_id별 amount 합계를 CTE done으로 만든 뒤 members와 조인한다. 총수량이 3 이상인 회원의 name, 총수량을 총수량 내림차순으로 조회한다.",
+    "sq-top-per-group": "products 테이블에서 category별 price 내림차순 ROW_NUMBER를 매긴 뒤 각 category의 순번 1인 상품만 남겨 category, name, price를 category 오름차순으로 조회한다.",
+    "sq-pivot": "orders와 products를 조인해 category별 완료 주문 수량 합계와 취소 주문 수량 합계를 각각 완료수량, 취소수량으로 한 행에 조회하고 category 오름차순으로 정렬한다.",
+    "sq-anti-join": "products와 orders를 LEFT JOIN해 한 번도 주문된 적 없는 상품의 name만 조회하고 name 오름차순으로 정렬한다.",
+    "sq-latest-per-member": "orders에서 회원별 최신 주문에 ROW_NUMBER 1을 매긴 뒤 members와 조인해 각 회원의 name과 가장 최근 ordered_at을 조회하고 최근 날짜 내림차순으로 정렬한다.",
+}
+
+
+def used_tables(sql):
+    ctes = set(re.findall(r"\b(?:WITH|,)\s*([A-Za-z_]\w*)\s+AS\s*\(", sql, flags=re.I))
+    refs = re.findall(r"\b(?:FROM|JOIN)\s+([A-Za-z_]\w*)", sql, flags=re.I)
+    out = []
+    for name in refs:
+        if name in ctes or name not in TABLE_META or name in out:
+            continue
+        out.append(name)
+    return out
+
+
 Q = []
 
 
 def q(id, lv, cat, title, brief, limits, logic, code, want,
       story="", where="", keys=None, walk=None, verify=None):
+    clean = code.strip("\n")
     Q.append(dict(id=id, lv=lv, cat=cat, title=title, brief=brief, limits=limits,
-                  logic=logic, code=code.strip("\n"), _want=want, _verify=verify,
+                  logic=logic, code=clean, _want=want, _verify=verify,
                   story=story, where=where, keys=keys or [], walk=walk or [],
+                  prompt=PROMPTS.get(id, ""), tables=[TABLE_META[t] for t in used_tables(clean)],
                   lang="sql"))
 
 
@@ -988,6 +1075,13 @@ if __name__ == "__main__":
         lines = [l for l in item["code"].split("\n") if l.strip()]
         if item["walk"] and len(item["walk"]) != len(lines):
             failed.append((item["id"], "walk %d줄 vs 코드 %d줄" % (len(item["walk"]), len(lines))))
+        if not item.get("prompt"):
+            failed.append((item["id"], "복습 문제 prompt 없음"))
+        if not item.get("tables"):
+            failed.append((item["id"], "사용 테이블 메타데이터 없음"))
+        for table in item.get("tables", []):
+            if table["name"] not in item["prompt"]:
+                failed.append((item["id"], "prompt에 사용 테이블 %s 누락" % table["name"]))
 
     for i, m in failed:
         print("FAIL %-22s %s" % (i, m))
