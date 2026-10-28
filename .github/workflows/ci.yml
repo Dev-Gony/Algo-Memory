@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
-      PYODIDE_TEST_DIR: ${{ runner.temp }}/algo-python
+      PYODIDE_TEST_DIR: /tmp/algo-python
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
