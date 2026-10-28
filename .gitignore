@@ -5,3 +5,6 @@ __pycache__/
 .vscode/
 .idea/
 *.log
+
+# Local browser QA evidence
+qa-local/

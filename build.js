@@ -14,7 +14,7 @@ const OUT = path.join(DIST, 'algo-memory.html');
 
 const read = (f) => fs.readFileSync(path.join(SRC, f), 'utf8');
 
-const css = read('styles.css').trim();
+const css = read('styles.css').trim() + '\n' + read('commute.css').trim();
 const pyCatalog = JSON.parse(read('catalog.json')).map((c) => Object.assign({ lang: 'python' }, c));
 const sqlCatalog = JSON.parse(read('sql-catalog.json')).map((c) => Object.assign({ lang: 'sql' }, c));
 const catalog = pyCatalog.concat(sqlCatalog);
@@ -39,6 +39,8 @@ if (!js.includes(marker)) {
   process.exit(1);
 }
 js = js.replace(marker, JSON.stringify(catalog));
+const commute = read('commute.js').replace('/*__COMMUTE_CATALOG__*/[]', JSON.stringify(JSON.parse(read('commute-catalog.json'))));
+js = read('commute-editor.js') + '\n' + commute + '\n' + js;
 
 let html = read('index.html');
 if (!html.includes('<!--INJECT:STYLES-->') || !html.includes('<!--INJECT:SCRIPT-->')) {

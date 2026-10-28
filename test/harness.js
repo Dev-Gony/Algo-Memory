@@ -11,7 +11,7 @@ function today() {
   return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 }
 
-function open({ storage, db } = {}) {
+function open({ storage, db, commute, url } = {}) {
   const html = fs.readFileSync(BUILT, 'utf8');
   const errors = [];
   const vc = new VirtualConsole();
@@ -20,12 +20,13 @@ function open({ storage, db } = {}) {
 
   const dom = new JSDOM(html, {
     runScripts: 'dangerously', pretendToBeVisual: true,
-    url: 'https://example.test/', virtualConsole: vc,
+    url: url || 'https://example.test/', virtualConsole: vc,
     beforeParse(w) {
       w.scrollTo = () => {};
       w.confirm = () => true;
       w.Element.prototype.scrollIntoView = function () {};
       if (storage) w.localStorage.setItem('algo-memory:v1', JSON.stringify(storage));
+      if (commute !== undefined) w.localStorage.setItem('algo-memory:commute:v1', typeof commute === 'string' ? commute : JSON.stringify(commute));
       if (db) w.claude = { use: (n) => Promise.resolve(n === 'db' ? db : null) };
     }
   });

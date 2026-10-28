@@ -809,6 +809,7 @@ function tile(lab, big, unit, note, pct, cls) {
 
 /* 표지. 기록이 하나라도 있으면 다시 나오지 않는다 — 매일 여는 사람에게는 마찰일 뿐이다. */
 function showLanding() {
+  if (S.view === 'commute') return false;
   if (S.landingForced) return true;
   return !S.problems.length && !S.settings.seenLanding;
 }
@@ -843,7 +844,8 @@ function renderLanding() {
     LANDING_CODE.map(function (l) { return l ? hl(l) : ' '; }).join('\n') +
     '</pre><span class="lday">30일 뒤</span></div>' +
     '<div class="lbtns">' +
-    '<button class="btn accent" data-act="enter">들어가기</button>' +
+    '<button class="btn accent" data-act="enter-commute">통근 · 짧은 코드 풀기</button>' +
+    '<button class="btn" data-act="enter">PC 학습 들어가기</button>' +
     '<button class="btn" data-act="enter-demo">예시 데이터로 둘러보기</button>' +
     '</div>' +
     '<div class="lproof">' +
@@ -2106,14 +2108,24 @@ function viewSettings() {
 }
 
 /* ============ render ============ */
-var VIEWS = { dash: viewDash, pack: viewPack, bank: viewBank, test: viewTest, drill: viewDrill, stats: viewStats, settings: viewSettings };
+var COMMUTE = null;
+var VIEWS = { commute: function () { return ''; }, dash: viewDash, pack: viewPack, bank: viewBank, test: viewTest, drill: viewDrill, stats: viewStats, settings: viewSettings };
 function render() {
   renderLanding();
-  if (S.view !== 'test' && S.view !== 'drill' && gateProblem()) S.view = 'dash';
-  document.body.classList.toggle('gated', !!gateProblem() && S.view !== 'test' && S.view !== 'drill');
+  document.body.classList.toggle('commuting', S.view === 'commute');
+  if (COMMUTE && S.view !== 'commute') COMMUTE.flush();
+  if (S.view !== 'commute' && S.view !== 'test' && S.view !== 'drill' && gateProblem()) S.view = 'dash';
+  document.body.classList.toggle('gated', !!gateProblem() && S.view !== 'commute' && S.view !== 'test' && S.view !== 'drill');
   Object.keys(VIEWS).forEach(function (k) {
     var el = document.getElementById('v-' + k);
-    if (k === S.view) { el.innerHTML = VIEWS[k](); el.classList.add('on'); }
+    if (k === 'commute') {
+      el.classList.toggle('on', S.view === k);
+      if (S.view === k) {
+        if (!COMMUTE) COMMUTE = window.AlgoCommute.attach(el, {});
+        COMMUTE.show();
+      }
+    }
+    else if (k === S.view) { el.innerHTML = VIEWS[k](); el.classList.add('on'); }
     else { el.classList.remove('on'); el.innerHTML = ''; }
   });
   Array.prototype.forEach.call(document.querySelectorAll('#nav button'), function (b) {
@@ -2133,7 +2145,7 @@ try { window.history.replaceState({ am: 0 }, ''); HIST.ok = true; } catch (e) { 
 function navSnap() { return { view: S.view, sel: S.sel, packLv: S.packLv, courseSel: S.courseSel }; }
 function navPush() {
   if (!HIST.ok) return;
-  try { HIST.depth++; window.history.pushState({ am: HIST.depth }, ''); } catch (e) { }
+  try { HIST.depth++; window.history.pushState({ am: HIST.depth }, '', S.view === 'commute' ? '#commute' : window.location.pathname + window.location.search); } catch (e) { }
 }
 function enter(v, keep) {
   S.hist.push(navSnap());
@@ -2596,6 +2608,7 @@ document.addEventListener('click', function (e) {
     S.detailTab = 'note'; S.explainOpen = null; S.explainShown = null;
     render(); return;
   }
+  if (a === 'enter-commute') { S.landingForced = false; goto('commute'); return; }
   if (a === 'back') { back(); return; }
   if (a === 'dtab') { S.detailTab = el.dataset.t; render(); return; }
   if (a === 'explain-open') {
@@ -2790,7 +2803,7 @@ document.addEventListener('click', function (e) {
     return;
   }
   if (a === 'copy-json') {
-    var data = JSON.stringify({ problems: S.problems, books: S.books, insights: S.insights, settings: S.settings }, null, 2);
+    var data = JSON.stringify({ problems: S.problems, books: S.books, insights: S.insights, settings: S.settings, daily: S.daily, commute: COMMUTE ? COMMUTE.backup() : (function () { try { return JSON.parse(localStorage.getItem(window.AlgoCommute.key) || 'null'); } catch (e) { return null; } })() }, null, 2);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(data).then(function () { toast('JSON을 클립보드에 복사했습니다'); },
         function () { toast('복사에 실패했습니다'); });
@@ -2843,7 +2856,7 @@ function refreshBankList() { clearTimeout(_bt); _bt = setTimeout(function () { i
 
 $('#nav').addEventListener('click', function (e) {
   var b = e.target.closest('button[data-v]'); if (!b) return;
-  if (gateProblem()) { toast('오늘의 관문을 먼저 통과하세요'); return; }
+  if (gateProblem() && b.dataset.v !== 'commute' && b.dataset.v !== 'dash') { toast('오늘의 관문을 먼저 통과하세요'); return; }
   if (S.view === 'test' && S.test && !S.test.result && $('#codeInput') && $('#codeInput').value.trim()) {
     if (!confirm('작성 중인 코드가 사라집니다. 이동할까요?')) return;
   }
@@ -2874,6 +2887,7 @@ window.AlgoMemoryApp = {
 
 /* ============ boot ============ */
 loadLocal();
+if (window.location.hash === '#commute') S.view = 'commute';
 try { _localBackup = JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) { _localBackup = null; }
 syncCatalogCode();
 render();
