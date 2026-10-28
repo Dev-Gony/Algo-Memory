@@ -18,6 +18,8 @@ jobs:
         run: python3 content/catalog3.py
       - name: SQL 템플릿 35개 실행 (sqlite3 로 실제 질의)
         run: python3 content/sql_catalog.py
+      - name: 통근 자체 문제와 경계 입력 검증
+        run: python3 test/commute_catalog_test.py
       - name: 생성된 카탈로그가 커밋본과 같은지
         run: git diff --exit-code src/catalog.json src/sql-catalog.json
 
@@ -30,6 +32,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "22" }
       - run: npm install --no-audit --no-fund
       - run: npm test
+
+  python-browser:
+    name: Python 격리 실행 및 모바일 브라우저
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYODIDE_TEST_DIR: /tmp/algo-python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node test/cache-python-runtime.js
+      - run: npm run test:python-browser
+      - run: npm run test:browser

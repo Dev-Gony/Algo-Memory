@@ -1,0 +1,604 @@
+[
+  {
+    "id": "even-count",
+    "level": 1,
+    "title": "짝수만 세기",
+    "minutes": 1,
+    "concept": "조건과 누적",
+    "prompt": "정수 리스트 nums에서 짝수의 개수를 반환하세요. 빈 리스트라면 0입니다.",
+    "signature": "nums",
+    "starter": "def solution(nums):\n    ",
+    "hints": [
+      "개수를 담는 값을 0에서 시작해 보세요.",
+      "짝수는 2로 나눈 나머지가 0입니다.",
+      "리스트를 돌며 조건을 만족할 때만 개수를 1 늘리세요."
+    ],
+    "solution": "def solution(nums):\n    count = 0\n    for n in nums:\n        if n % 2 == 0:\n            count += 1\n    return count",
+    "explanation": "조건을 만족하는 원소마다 개수를 하나씩 올립니다. 0과 음의 짝수도 세어야 합니다. sum(n % 2 == 0 for n in nums)처럼 다른 합법적인 풀이도 가능합니다.",
+    "variation": "odd-sum",
+    "tests": [
+      {
+        "args": [
+          [
+            1,
+            2,
+            4,
+            7
+          ]
+        ],
+        "want": 2
+      },
+      {
+        "args": [
+          []
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          [
+            0,
+            -2,
+            -3
+          ]
+        ],
+        "want": 2
+      },
+      {
+        "args": [
+          [
+            1,
+            3
+          ]
+        ],
+        "want": 0
+      }
+    ]
+  },
+  {
+    "id": "odd-sum",
+    "level": 1,
+    "title": "홀수만 더하기",
+    "minutes": 1,
+    "concept": "조건과 누적",
+    "prompt": "정수 리스트 nums에서 홀수만 더한 값을 반환하세요. 빈 리스트라면 0입니다.",
+    "signature": "nums",
+    "starter": "def solution(nums):\n    ",
+    "hints": [
+      "이번에는 개수가 아니라 합계를 누적합니다.",
+      "홀수의 조건은 n % 2 != 0 입니다.",
+      "조건을 만족하면 합계에 현재 숫자를 더하세요."
+    ],
+    "solution": "def solution(nums):\n    total = 0\n    for n in nums:\n        if n % 2 != 0:\n            total += n\n    return total",
+    "explanation": "홀수인 원소만 합계에 더합니다. 음의 홀수도 빠뜨리지 마세요. 짝수 개수 문제에서 조건과 누적 대상을 바꾼 작은 변형입니다.",
+    "variation": "even-count",
+    "tests": [
+      {
+        "args": [
+          [
+            1,
+            2,
+            3,
+            4
+          ]
+        ],
+        "want": 4
+      },
+      {
+        "args": [
+          []
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          [
+            -3,
+            -2,
+            5
+          ]
+        ],
+        "want": 2
+      },
+      {
+        "args": [
+          [
+            0,
+            2
+          ]
+        ],
+        "want": 0
+      }
+    ]
+  },
+  {
+    "id": "clamp-score",
+    "level": 1,
+    "title": "점수를 범위 안으로",
+    "minutes": 1,
+    "concept": "조건 분기",
+    "prompt": "정수 score가 0보다 작으면 0, 100보다 크면 100, 나머지는 원래 값을 반환하세요.",
+    "signature": "score",
+    "starter": "def solution(score):\n    ",
+    "hints": [
+      "범위 밖인 두 경우를 먼저 나누세요.",
+      "경계값 0과 100은 그대로 반환합니다.",
+      "마지막 경우에는 원래 score를 반환하면 됩니다."
+    ],
+    "solution": "def solution(score):\n    if score < 0:\n        return 0\n    if score > 100:\n        return 100\n    return score",
+    "explanation": "아래 경계와 위 경계를 각각 처리합니다. min(100, max(0, score))도 같은 계약을 만족하는 풀이입니다.",
+    "variation": "first-positive",
+    "tests": [
+      {
+        "args": [
+          135
+        ],
+        "want": 100
+      },
+      {
+        "args": [
+          -1
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          0
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          100
+        ],
+        "want": 100
+      },
+      {
+        "args": [
+          73
+        ],
+        "want": 73
+      }
+    ]
+  },
+  {
+    "id": "first-positive",
+    "level": 1,
+    "title": "첫 양수 찾기",
+    "minutes": 2,
+    "concept": "조기 반환",
+    "prompt": "정수 리스트 nums에서 처음 나오는 양수를 반환하세요. 양수가 없으면 0을 반환하세요. 0은 양수가 아닙니다.",
+    "signature": "nums",
+    "starter": "def solution(nums):\n    ",
+    "hints": [
+      "왼쪽부터 순서대로 확인하세요.",
+      "n > 0이면 더 찾지 않고 바로 반환할 수 있습니다.",
+      "끝까지 찾지 못한 경우의 return은 반복문 밖에 둡니다."
+    ],
+    "solution": "def solution(nums):\n    for n in nums:\n        if n > 0:\n            return n\n    return 0",
+    "explanation": "첫 번째만 필요하므로 발견한 순간 반환합니다. 실패 시 반환을 반복문 안에 두면 뒤의 양수를 확인하지 못합니다.",
+    "variation": "clamp-score",
+    "tests": [
+      {
+        "args": [
+          [
+            -2,
+            0,
+            4,
+            3
+          ]
+        ],
+        "want": 4
+      },
+      {
+        "args": [
+          []
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          [
+            -1,
+            0
+          ]
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          [
+            2,
+            1
+          ]
+        ],
+        "want": 2
+      },
+      {
+        "args": [
+          [
+            2,
+            7
+          ]
+        ],
+        "want": 2
+      }
+    ]
+  },
+  {
+    "id": "running-sum",
+    "level": 2,
+    "title": "지금까지의 합",
+    "minutes": 2,
+    "concept": "누적합",
+    "prompt": "정수 리스트 nums의 각 위치까지의 합을 새 리스트로 반환하세요. 예: [2, 3, -1] → [2, 5, 4]. 원본 리스트는 바꾸지 마세요.",
+    "signature": "nums",
+    "starter": "def solution(nums):\n    ",
+    "hints": [
+      "지금까지의 합과 결과 리스트가 각각 필요합니다.",
+      "현재 숫자를 합계에 더한 다음 결과에 넣으세요.",
+      "append(total)을 반복문 안에서 실행합니다."
+    ],
+    "solution": "def solution(nums):\n    total = 0\n    result = []\n    for n in nums:\n        total += n\n        result.append(total)\n    return result",
+    "explanation": "원소를 더한 직후의 합계를 차례대로 저장합니다. 입력을 직접 수정하지 않아야 빈 입력이나 반복 호출도 다루기 쉽습니다.",
+    "variation": "positive-filter",
+    "tests": [
+      {
+        "args": [
+          [
+            2,
+            3,
+            -1
+          ]
+        ],
+        "want": [
+          2,
+          5,
+          4
+        ]
+      },
+      {
+        "args": [
+          []
+        ],
+        "want": []
+      },
+      {
+        "args": [
+          [
+            0
+          ]
+        ],
+        "want": [
+          0
+        ]
+      },
+      {
+        "args": [
+          [
+            -2,
+            2
+          ]
+        ],
+        "want": [
+          -2,
+          0
+        ]
+      }
+    ],
+    "preserveInput": true
+  },
+  {
+    "id": "positive-filter",
+    "level": 2,
+    "title": "양수만 남기기",
+    "minutes": 2,
+    "concept": "새 리스트 만들기",
+    "prompt": "정수 리스트 nums에서 양수만 원래 순서대로 담은 새 리스트를 반환하세요. 입력은 바꾸지 마세요.",
+    "signature": "nums",
+    "starter": "def solution(nums):\n    ",
+    "hints": [
+      "비어 있는 결과 리스트에서 시작하세요.",
+      "양수는 0보다 큰 값입니다.",
+      "조건을 만족할 때만 append하세요. 리스트 컴프리헨션도 가능합니다."
+    ],
+    "solution": "def solution(nums):\n    result = []\n    for n in nums:\n        if n > 0:\n            result.append(n)\n    return result",
+    "explanation": "값을 선별해 새 리스트에 넣습니다. sorted를 쓰면 원래 순서를 잃을 수 있으니 요구사항을 확인하세요.",
+    "variation": "running-sum",
+    "tests": [
+      {
+        "args": [
+          [
+            -1,
+            3,
+            0,
+            2
+          ]
+        ],
+        "want": [
+          3,
+          2
+        ]
+      },
+      {
+        "args": [
+          []
+        ],
+        "want": []
+      },
+      {
+        "args": [
+          [
+            -3,
+            0
+          ]
+        ],
+        "want": []
+      },
+      {
+        "args": [
+          [
+            2,
+            2,
+            1
+          ]
+        ],
+        "want": [
+          2,
+          2,
+          1
+        ]
+      }
+    ],
+    "preserveInput": true
+  },
+  {
+    "id": "char-count",
+    "level": 2,
+    "title": "글자별 출석부",
+    "minutes": 2,
+    "concept": "딕셔너리",
+    "prompt": "영문 소문자 문자열 text에서 각 글자가 몇 번 나오는지 딕셔너리로 반환하세요. 빈 문자열은 {}입니다. 키 순서는 상관없습니다.",
+    "signature": "text",
+    "starter": "def solution(text):\n    ",
+    "hints": [
+      "글자를 키, 등장 횟수를 값으로 사용합니다.",
+      "처음 등장한 글자의 기존 횟수는 0으로 생각하세요.",
+      "counts.get(ch, 0) + 1로 갱신할 수 있습니다."
+    ],
+    "solution": "def solution(text):\n    counts = {}\n    for ch in text:\n        counts[ch] = counts.get(ch, 0) + 1\n    return counts",
+    "explanation": "아직 없는 키를 0으로 취급하면 첫 등장과 재등장을 같은 코드로 처리할 수 있습니다. collections.Counter를 dict로 바꾸는 풀이도 가능합니다.",
+    "variation": "stable-unique",
+    "tests": [
+      {
+        "args": [
+          "aba"
+        ],
+        "want": {
+          "a": 2,
+          "b": 1
+        }
+      },
+      {
+        "args": [
+          ""
+        ],
+        "want": {}
+      },
+      {
+        "args": [
+          "z"
+        ],
+        "want": {
+          "z": 1
+        }
+      },
+      {
+        "args": [
+          "aaaa"
+        ],
+        "want": {
+          "a": 4
+        }
+      }
+    ]
+  },
+  {
+    "id": "stable-unique",
+    "level": 2,
+    "title": "처음 나온 순서만",
+    "minutes": 3,
+    "concept": "중복과 순서",
+    "prompt": "정수 리스트 nums의 중복을 제거하되 처음 등장한 순서로 반환하세요. 입력은 바꾸지 마세요.",
+    "signature": "nums",
+    "starter": "def solution(nums):\n    ",
+    "hints": [
+      "이미 본 값과 결과의 순서는 다른 역할입니다.",
+      "seen 집합과 result 리스트를 함께 사용할 수 있습니다.",
+      "seen에 없는 값만 result에 넣고 seen에도 추가하세요."
+    ],
+    "solution": "def solution(nums):\n    seen = set()\n    result = []\n    for n in nums:\n        if n not in seen:\n            seen.add(n)\n            result.append(n)\n    return result",
+    "explanation": "집합은 중복 확인에 쓰고 리스트는 순서를 보존하는 데 씁니다. dict.fromkeys(nums)를 리스트로 바꾸는 풀이도 가능합니다.",
+    "variation": "char-count",
+    "tests": [
+      {
+        "args": [
+          [
+            3,
+            1,
+            3,
+            2,
+            1
+          ]
+        ],
+        "want": [
+          3,
+          1,
+          2
+        ]
+      },
+      {
+        "args": [
+          []
+        ],
+        "want": []
+      },
+      {
+        "args": [
+          [
+            0,
+            0,
+            -1
+          ]
+        ],
+        "want": [
+          0,
+          -1
+        ]
+      },
+      {
+        "args": [
+          [
+            4
+          ]
+        ],
+        "want": [
+          4
+        ]
+      }
+    ],
+    "preserveInput": true
+  },
+  {
+    "id": "pair-sum",
+    "level": 3,
+    "title": "이웃 둘의 가장 큰 합",
+    "minutes": 3,
+    "concept": "경계와 순회",
+    "prompt": "정수 리스트 nums에서 서로 이웃한 두 수의 합 중 최댓값을 반환하세요. 원소가 2개 미만이면 0입니다. 전부 음수일 수도 있습니다.",
+    "signature": "nums",
+    "starter": "def solution(nums):\n    ",
+    "hints": [
+      "원소가 부족한 경우를 먼저 처리하세요.",
+      "최댓값을 0으로 시작하면 모두 음수인 경우 틀립니다.",
+      "첫 두 수의 합으로 시작하고 다음 이웃 쌍들을 비교하세요."
+    ],
+    "solution": "def solution(nums):\n    if len(nums) < 2:\n        return 0\n    best = nums[0] + nums[1]\n    for i in range(1, len(nums) - 1):\n        best = max(best, nums[i] + nums[i + 1])\n    return best",
+    "explanation": "실제로 존재하는 첫 쌍으로 최댓값을 초기화해야 음수 입력도 처리됩니다. 마지막 인덱스가 범위를 넘지 않는지 확인하세요.",
+    "variation": "longest-positive",
+    "tests": [
+      {
+        "args": [
+          [
+            2,
+            5,
+            -1,
+            4
+          ]
+        ],
+        "want": 7
+      },
+      {
+        "args": [
+          []
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          [
+            9
+          ]
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          [
+            -5,
+            -2,
+            -4
+          ]
+        ],
+        "want": -6
+      },
+      {
+        "args": [
+          [
+            0,
+            0
+          ]
+        ],
+        "want": 0
+      }
+    ]
+  },
+  {
+    "id": "longest-positive",
+    "level": 3,
+    "title": "양수가 이어진 길이",
+    "minutes": 3,
+    "concept": "연속 구간",
+    "prompt": "정수 리스트 nums에서 양수가 연속으로 나오는 가장 긴 구간의 길이를 반환하세요. 0 또는 음수에서 구간이 끊깁니다.",
+    "signature": "nums",
+    "starter": "def solution(nums):\n    ",
+    "hints": [
+      "현재 구간 길이와 가장 긴 길이를 따로 관리합니다.",
+      "양수면 현재 길이를 늘리고, 아니면 0으로 초기화하세요.",
+      "매번 best를 현재 길이와 비교해서 갱신하세요."
+    ],
+    "solution": "def solution(nums):\n    current = 0\n    best = 0\n    for n in nums:\n        if n > 0:\n            current += 1\n        else:\n            current = 0\n        best = max(best, current)\n    return best",
+    "explanation": "현재 구간은 끊길 때 초기화하지만, 최장 기록은 유지합니다. 마지막 구간도 놓치지 않도록 반복 도중 최장 기록을 갱신합니다.",
+    "variation": "pair-sum",
+    "tests": [
+      {
+        "args": [
+          [
+            1,
+            2,
+            0,
+            3,
+            4,
+            5
+          ]
+        ],
+        "want": 3
+      },
+      {
+        "args": [
+          []
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          [
+            0,
+            -1
+          ]
+        ],
+        "want": 0
+      },
+      {
+        "args": [
+          [
+            1,
+            2,
+            3
+          ]
+        ],
+        "want": 3
+      },
+      {
+        "args": [
+          [
+            1,
+            -1,
+            2
+          ]
+        ],
+        "want": 1
+      }
+    ]
+  }
+]

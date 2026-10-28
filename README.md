@@ -3,6 +3,10 @@
 에빙하우스 망각곡선을 바탕으로 알고리즘 코드의 재현 학습과 복습 일정을 관리하는 학습 도구입니다.
 코딩테스트 풀이를 한 번 통과하는 데서 끝내지 않고, 시간이 지난 뒤에도 핵심 구현을 다시 작성할 수 있는지 검증하는 데 초점을 둡니다.
 
+## 통근용 짧은 Python 연습
+
+첫 화면의 **통근 · 짧은 코드 풀기** 또는 `/#commute`에서 자체 문제 10개를 1~3분 목표로 작성합니다. Enter 자동 들여쓰기, 터치 입력 바, 단계별 힌트, 별도 복습 기록을 제공합니다. 공식 Pyodide를 격리된 Worker에서 실행해 입력·출력으로 채점하고, 3초 초과 시 종료합니다. 최초 런타임 파일은 약 12.3MB(압축 전 합계)이며 기존 PC 암기 점수와 분리됩니다. 예전 자가 확인 기록은 미검증 상태로 보존합니다. 사용법·오프라인 범위·검증 한계는 [docs/commute.md](docs/commute.md)에 정리했습니다.
+
 ## Problem
 
 온라인 저지는 정답 여부를 확인해 주지만, 풀이한 코드를 일정 시간이 지난 뒤에도 다시 재현할 수 있는지는 관리하지 않습니다.
@@ -100,7 +104,7 @@ dist/               Single-file deployment output
 npm install
 npm run build     # src/ → dist/algo-memory.html
 npm test          # build + jsdom end-to-end tests
-npm run serve     # http://localhost:8080
+npm run serve     # http://127.0.0.1:8080/#commute (loopback only)
 npm run catalog   # 105개 템플릿 검증 후 카탈로그 생성
 ```
 

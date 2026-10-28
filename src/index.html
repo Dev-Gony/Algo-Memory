@@ -32,6 +32,7 @@
   </div>
   <nav id="nav">
     <button data-v="dash" aria-current="true">대시보드<span class="badge" id="navDue" hidden>0</span></button>
+    <button data-v="commute">통근 · 짧은 코드</button>
     <button data-v="pack">코스</button>
     <button data-v="bank">문제 은행</button>
     <button data-v="stats">통계</button>
@@ -41,6 +42,7 @@
 
 <main>
   <section class="view on" id="v-dash"></section>
+  <section class="view" id="v-commute"></section>
   <section class="view" id="v-pack"></section>
   <section class="view" id="v-bank"></section>
   <section class="view" id="v-test"></section>
@@ -55,7 +57,7 @@
 <div id="authRoot" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js" defer></script>
-<!--DEV--><script src="cloud-config.js"></script><script src="cloud.js"></script><script src="app.js"></script><!--/DEV-->
+<!--DEV--><script src="cloud-config.js"></script><script src="cloud.js"></script><script src="commute-editor.js"></script><script src="python-runner.js"></script><script src="commute.js"></script><script src="app.js"></script><!--/DEV-->
 <!--INJECT:SCRIPT-->
 </body>
 </html>
