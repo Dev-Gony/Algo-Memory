@@ -1124,18 +1124,224 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   'use strict';
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.AlgoPython = api;
+})(typeof window !== 'undefined' ? window : globalThis, function () {
+  'use strict';
+  var VERSION = '0.29.4';
+  var BASE = 'https://cdn.jsdelivr.net/pyodide/v' + VERSION + '/full/';
+  var ASSETS = [
+    { name: 'pyodide.js', bytes: 18597, sha256: '7be9e63eddf6bd8786a5ab71c8689c35731d187e3415fe58d7cb95423b50421a' },
+    { name: 'pyodide.asm.js', bytes: 1074322, sha256: 'fe75e97ef2c7a10c41f23b96344c553c7c1c62821bb206080dbb24941c06d5f3' },
+    { name: 'pyodide.asm.wasm', bytes: 8647684, sha256: '10090fe41e019ae669d512e1f747021a8db2aaab0f6dd6f85fa9368c55d681e3' },
+    { name: 'python_stdlib.zip', bytes: 2424002, sha256: '92cb24faa546818f3ef4050fd5bd2b6487bd2042efed2113af141d035f30efb4' },
+    { name: 'pyodide-lock.json', bytes: 122027, sha256: '14d2c2dba101277999e17135e653d8f15389ad1437f53eae213bf0c3cdff723d' }
+  ];
+  var CACHE = 'algo-memory-pyodide-' + VERSION;
+  var buffers = null;
+  function fault(status, detail) { return { status: status, detail: String(detail || '').slice(0, 240) }; }
+  function workerEntry() {
+    'use strict';
+    var py, send = self.postMessage.bind(self), started = false;
+    self.onmessage = async function (event) {
+      if (started) return;
+      started = true;
+      var data = event.data, files = Object.create(null), urls = [], decoder = new TextDecoder();
+      try {
+        data.assets.forEach(function (a) { files[a.name] = a.buffer; });
+        var nativeImport = self.importScripts.bind(self), base = 'https://runtime.invalid/';
+        var scripts = Object.create(null);
+        ['pyodide.js', 'pyodide.asm.js'].forEach(function (name) {
+          scripts[base + name] = URL.createObjectURL(new Blob([files[name]], { type: 'text/javascript' })); urls.push(scripts[base + name]);
+        });
+        Object.defineProperty(self, 'importScripts', { configurable: false, writable: false, value: function () {
+          Array.prototype.forEach.call(arguments, function (url) {
+            if (!scripts[url]) throw new Error('Additional scripts are disabled');
+            nativeImport(scripts[url]);
+          });
+        } });
+        // All runtime reads come from verified bytes. CSP also blocks native network APIs.
+        Object.defineProperty(self, 'fetch', { configurable: false, writable: false, value: function (input) {
+          var url = typeof input === 'string' ? input : (input.url || input.href || String(input));
+          var name = url && url.startsWith(base) ? url.slice(base.length) : '';
+          if (!Object.prototype.hasOwnProperty.call(files, name)) return Promise.reject(new TypeError('Execution network access is disabled'));
+          return Promise.resolve(new Response(files[name].slice(0), { headers: { 'Content-Type': name.endsWith('.wasm') ? 'application/wasm' : 'application/octet-stream' } }));
+        } });
+        self.importScripts(base + 'pyodide.js');
+        py = await self.loadPyodide({ indexURL: base, stdLibURL: base + 'python_stdlib.zip',
+          lockFileContents: decoder.decode(files['pyodide-lock.json']), fullStdLib: false,
+          jsglobals: Object.create(null), stdout: function () {}, stderr: function () {} });
+        urls.forEach(function (u) { URL.revokeObjectURL(u); });
+        send({ phase: 'ready' });
+      } catch (e) { send({ phase: 'result', result: { status: 'load-error', detail: 'Python 초기화 실패: ' + String(e.message || e).slice(0, 180) } }); return; }
+      self.onmessage = function (e) {
+        if (e.data.phase !== 'execute') return;
+        self.onmessage = null;
+        try {
+          py.globals.set('_cm_payload', JSON.stringify(e.data.payload));
+          var json = py.runPython(data.harness);
+          send({ phase: 'result', result: JSON.parse(json) });
+        } catch (err) { send({ phase: 'result', result: { status: 'runtime-error', detail: String(err.message || err).slice(0, 240) } }); }
+      };
+    };
+  }
+  var HARNESS = [
+    'import json as _json, copy as _copy, math as _math',
+    '_cm_sum = sum',
+    '_cm_data = _json.loads(_cm_payload)',
+    'def _cm_same(a, b):',
+    '    if isinstance(b, bool): return type(a) is bool and a == b',
+    '    if isinstance(b, (int, float)): return type(a) in (int, float) and a == b',
+    '    if isinstance(b, list): return isinstance(a, list) and len(a) == len(b) and all(_cm_same(x, y) for x, y in zip(a, b))',
+    '    if isinstance(b, dict): return isinstance(a, dict) and a.keys() == b.keys() and all(_cm_same(a[k], b[k]) for k in b)',
+    '    return type(a) is type(b) and a == b',
+    'def _cm_run(data):',
+    '    scope = {"__name__": "__answer__"}',
+    '    try: compiled = compile(data["code"], "answer.py", "exec")',
+    '    except SyntaxError as e: return {"status": "syntax-error", "detail": str(e.msg)[:160], "line": e.lineno, "column": e.offset}',
+    '    try:',
+    '        exec(compiled, scope)',
+    '        fn = scope.get("solution")',
+    '        if not callable(fn): return {"status": "runtime-error", "detail": "solution 함수를 정의해 주세요."}',
+    '    except BaseException as e: return {"status": "runtime-error", "detail": (type(e).__name__ + ": " + str(e))[:200]}',
+    '    rows = []',
+    '    for index, case in enumerate(data["tests"]):',
+    '        args = _copy.deepcopy(case["args"])',
+    '        try:',
+    '            got = fn(*args)',
+    '            mutated = data.get("preserveInput", False) and not _cm_same(args, case["args"])',
+    '            ok = _cm_same(got, case["want"]) and not mutated',
+    '            rows.append({"index": index, "ok": ok, "actual": repr(got)[:160], "mutated": bool(mutated)})',
+    '        except BaseException as e: rows.append({"index": index, "ok": False, "error": (type(e).__name__ + ": " + str(e))[:200]})',
+    '    passed = _cm_sum(row["ok"] for row in rows)',
+    '    status = "passed" if passed == len(rows) else ("runtime-error" if any("error" in row for row in rows) else "wrong-answer")',
+    '    return {"status": status, "rows": rows, "passed": passed, "total": len(rows)}',
+    '_json.dumps(_cm_run(_cm_data), ensure_ascii=False)'
+  ].join('\n');
+  function frameEntry(workerSource) {
+    'use strict';
+    window.addEventListener('message', function init(e) {
+      if (e.source !== parent || !e.ports[0]) return;
+      window.removeEventListener('message', init);
+      var port = e.ports[0], worker;
+      try {
+        var url = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
+        worker = new Worker(url); URL.revokeObjectURL(url);
+        worker.onmessage = function (message) { port.postMessage(message.data); };
+        worker.onerror = function () { port.postMessage({ phase: 'result', result: { status: 'load-error', detail: '격리된 Worker 초기화 실패' } }); };
+        port.onmessage = function (message) {
+          if (message.data.phase === 'execute') worker.postMessage(message.data);
+        };
+        worker.postMessage(e.data, e.data.assets.map(function (a) { return a.buffer; }));
+      } catch (error) { port.postMessage({ phase: 'result', result: { status: 'load-error', detail: '브라우저가 격리 실행을 지원하지 않습니다.' } }); }
+    });
+  }
+  function create(win, options) {
+    options = options || {};
+    var active = null;
+    async function assets(signal, progress) {
+      if (buffers) return buffers;
+      if (!win.crypto || !win.crypto.subtle) throw fault('load-error', '런타임 무결성 검증에는 HTTPS 또는 localhost가 필요합니다.');
+      var cache = null, done = 0;
+      try { if (win.caches) cache = await win.caches.open(CACHE); } catch (e) { /* memory-only fallback */ }
+      var loaded = await Promise.all(ASSETS.map(async function (asset) {
+        var url = BASE + asset.name, response, cached = false;
+        try { if (cache) { response = await cache.match(url); cached = !!response; } } catch (e) { /* cache unavailable */ }
+        if (!response) {
+          try { response = await win.fetch(url, { signal: signal, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'force-cache' }); }
+          catch (e) { throw fault(signal.aborted ? 'cancelled' : 'network-error', win.navigator.onLine === false ? '네트워크 연결이 끊겼습니다. 저장된 런타임이 있으면 오프라인으로 다시 시도할 수 있습니다.' : 'Python 런타임 다운로드 연결이 끊겼습니다. 네트워크와 CDN 연결을 확인하세요.'); }
+        }
+        if (!response.ok) throw fault('load-error', '런타임 파일 응답 오류: ' + response.status);
+        var bytes;
+        try { bytes = await response.arrayBuffer(); }
+        catch (e) { throw fault(signal.aborted ? 'cancelled' : 'network-error', '런타임 파일을 받는 중 연결이 끊겼습니다. 다시 시도하세요.'); }
+        var hash = Array.from(new Uint8Array(await win.crypto.subtle.digest('SHA-256', bytes))).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+        if (bytes.byteLength !== asset.bytes || hash !== asset.sha256) {
+          if (cached && cache) await cache.delete(url);
+          throw fault('load-error', '런타임 파일 무결성 불일치. 다시 다운로드해 주세요.');
+        }
+        if (!cached && cache) { try { await cache.put(url, new win.Response(bytes.slice(0))); } catch (e) { /* cache quota: current run still works */ } }
+        done++; progress({ status: 'downloading', loaded: done, total: ASSETS.length });
+        return { name: asset.name, buffer: bytes };
+      }));
+      buffers = loaded; return loaded;
+    }
+    function cancel() { if (active) active.finish(fault('cancelled', '실행을 중단했습니다.')); }
+    function run(code, tests, preserveInput, onProgress) {
+      cancel();
+      var progress = typeof onProgress === 'function' ? onProgress : function () {};
+      return new Promise(function (resolve) {
+        var controller = new win.AbortController(), frame = null, channel = null, timer = null, settled = false;
+        var ticket = { finish: finish }; active = ticket;
+        function finish(result) {
+          if (settled) return;
+          settled = true; win.clearTimeout(timer); controller.abort();
+          if (channel) { channel.port1.close(); channel.port2.close(); }
+          if (frame) frame.remove();
+          if (active === ticket) active = null;
+          resolve(result);
+        }
+        if (typeof code !== 'string' || code.length > 50000 || !Array.isArray(tests) || tests.length < 1 || tests.length > 20) { finish(fault('runtime-error', '지원하는 코드·테스트 범위를 벗어났습니다.')); return; }
+        progress({ status: 'downloading', loaded: 0, total: ASSETS.length });
+        timer = win.setTimeout(function () { finish(fault('network-error', '런타임 다운로드 대기 시간을 초과했습니다. 연결을 확인하고 다시 시도하세요.')); }, options.downloadMs || 45000);
+        assets(controller.signal, progress).then(function (files) {
+          if (settled) return;
+          win.clearTimeout(timer);
+          progress({ status: 'initializing' });
+          timer = win.setTimeout(function () { finish(fault('load-error', 'Python 초기화 시간을 초과했습니다. 다시 시도하세요.')); }, options.initMs || 30000);
+          var worker = '(' + workerEntry.toString() + ')();';
+          var bootstrap = '(' + frameEntry.toString() + ')(' + JSON.stringify(worker).replace(/</g, '\\u003c') + ');';
+          frame = win.document.createElement('iframe'); frame.hidden = true; frame.title = '격리된 Python 실행';
+          frame.setAttribute('sandbox', 'allow-scripts'); frame.setAttribute('referrerpolicy', 'no-referrer');
+          frame.setAttribute('allow', "camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; usb 'none'");
+          var csp = "default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src blob:; connect-src 'none'; child-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'";
+          frame.srcdoc = '<!doctype html><meta http-equiv="Content-Security-Policy" content="' + csp + '"><scr' + 'ipt>' + bootstrap + '</scr' + 'ipt>';
+          channel = new win.MessageChannel();
+          channel.port1.onmessage = function (e) {
+            if (settled) return;
+            if (e.data && e.data.phase === 'ready') {
+              win.clearTimeout(timer); progress({ status: 'running' });
+              timer = win.setTimeout(function () { finish(fault('timeout', '실행 제한 3초를 넘겨 Worker를 종료했습니다. 다음 실행은 새 Worker에서 시작합니다.')); }, options.runMs || 3000);
+              channel.port1.postMessage({ phase: 'execute', payload: { code: code, tests: tests, preserveInput: !!preserveInput } });
+            } else if (e.data && e.data.phase === 'result') {
+              var result = e.data.result;
+              if (!result || !['passed','wrong-answer','syntax-error','runtime-error','load-error'].includes(result.status) ||
+                (result.rows && (!Array.isArray(result.rows) || result.rows.length !== tests.length)) ||
+                (result.status === 'passed' && (result.passed !== tests.length || result.total !== tests.length || !result.rows.every(function (r) { return r.ok === true; })))) {
+                finish(fault('load-error', '실행기 결과 형식이 올바르지 않습니다.')); return;
+              }
+              finish(result);
+            }
+          };
+          frame.onload = function () {
+            if (settled) return;
+            var copied = files.map(function (a) { return { name: a.name, buffer: a.buffer.slice(0) }; });
+            frame.contentWindow.postMessage({ assets: copied, harness: HARNESS }, '*', [channel.port2].concat(copied.map(function (a) { return a.buffer; })));
+          };
+          win.document.body.appendChild(frame);
+        }).catch(function (e) { finish(e && e.status ? e : fault('load-error', '실행기 준비 실패: ' + String(e.message || e))); });
+      });
+    }
+    return { run: run, cancel: cancel };
+  }
+  return { create: create, version: VERSION, assets: ASSETS, base: BASE, cacheName: CACHE };
+});
+
+(function (root, factory) {
+  'use strict';
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
   else root.AlgoCommute = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  var CATALOG = [{"id":"even-count","level":1,"title":"짝수만 세기","minutes":1,"concept":"조건과 누적","prompt":"정수 리스트 nums에서 짝수의 개수를 반환하세요. 빈 리스트라면 0입니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["개수를 담는 값을 0에서 시작해 보세요.","짝수는 2로 나눈 나머지가 0입니다.","리스트를 돌며 조건을 만족할 때만 개수를 1 늘리세요."],"solution":"def solution(nums):\n    count = 0\n    for n in nums:\n        if n % 2 == 0:\n            count += 1\n    return count","explanation":"조건을 만족하는 원소마다 개수를 하나씩 올립니다. 0과 음의 짝수도 세어야 합니다. sum(n % 2 == 0 for n in nums)처럼 다른 합법적인 풀이도 가능합니다.","variation":"odd-sum","tests":[{"args":[[1,2,4,7]],"want":2},{"args":[[]],"want":0},{"args":[[0,-2,-3]],"want":2},{"args":[[1,3]],"want":0}]},{"id":"odd-sum","level":1,"title":"홀수만 더하기","minutes":1,"concept":"조건과 누적","prompt":"정수 리스트 nums에서 홀수만 더한 값을 반환하세요. 빈 리스트라면 0입니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["이번에는 개수가 아니라 합계를 누적합니다.","홀수의 조건은 n % 2 != 0 입니다.","조건을 만족하면 합계에 현재 숫자를 더하세요."],"solution":"def solution(nums):\n    total = 0\n    for n in nums:\n        if n % 2 != 0:\n            total += n\n    return total","explanation":"홀수인 원소만 합계에 더합니다. 음의 홀수도 빠뜨리지 마세요. 짝수 개수 문제에서 조건과 누적 대상을 바꾼 작은 변형입니다.","variation":"even-count","tests":[{"args":[[1,2,3,4]],"want":4},{"args":[[]],"want":0},{"args":[[-3,-2,5]],"want":2},{"args":[[0,2]],"want":0}]},{"id":"clamp-score","level":1,"title":"점수를 범위 안으로","minutes":1,"concept":"조건 분기","prompt":"정수 score가 0보다 작으면 0, 100보다 크면 100, 나머지는 원래 값을 반환하세요.","signature":"score","starter":"def solution(score):\n    ","hints":["범위 밖인 두 경우를 먼저 나누세요.","경계값 0과 100은 그대로 반환합니다.","마지막 경우에는 원래 score를 반환하면 됩니다."],"solution":"def solution(score):\n    if score < 0:\n        return 0\n    if score > 100:\n        return 100\n    return score","explanation":"아래 경계와 위 경계를 각각 처리합니다. min(100, max(0, score))도 같은 계약을 만족하는 풀이입니다.","variation":"first-positive","tests":[{"args":[135],"want":100},{"args":[-1],"want":0},{"args":[0],"want":0},{"args":[100],"want":100},{"args":[73],"want":73}]},{"id":"first-positive","level":1,"title":"첫 양수 찾기","minutes":2,"concept":"조기 반환","prompt":"정수 리스트 nums에서 처음 나오는 양수를 반환하세요. 양수가 없으면 0을 반환하세요. 0은 양수가 아닙니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["왼쪽부터 순서대로 확인하세요.","n > 0이면 더 찾지 않고 바로 반환할 수 있습니다.","끝까지 찾지 못한 경우의 return은 반복문 밖에 둡니다."],"solution":"def solution(nums):\n    for n in nums:\n        if n > 0:\n            return n\n    return 0","explanation":"첫 번째만 필요하므로 발견한 순간 반환합니다. 실패 시 반환을 반복문 안에 두면 뒤의 양수를 확인하지 못합니다.","variation":"clamp-score","tests":[{"args":[[-2,0,4,3]],"want":4},{"args":[[]],"want":0},{"args":[[-1,0]],"want":0},{"args":[[2,1]],"want":2},{"args":[[2,7]],"want":2}]},{"id":"running-sum","level":2,"title":"지금까지의 합","minutes":2,"concept":"누적합","prompt":"정수 리스트 nums의 각 위치까지의 합을 새 리스트로 반환하세요. 예: [2, 3, -1] → [2, 5, 4]. 원본 리스트는 바꾸지 마세요.","signature":"nums","starter":"def solution(nums):\n    ","hints":["지금까지의 합과 결과 리스트가 각각 필요합니다.","현재 숫자를 합계에 더한 다음 결과에 넣으세요.","append(total)을 반복문 안에서 실행합니다."],"solution":"def solution(nums):\n    total = 0\n    result = []\n    for n in nums:\n        total += n\n        result.append(total)\n    return result","explanation":"원소를 더한 직후의 합계를 차례대로 저장합니다. 입력을 직접 수정하지 않아야 빈 입력이나 반복 호출도 다루기 쉽습니다.","variation":"positive-filter","tests":[{"args":[[2,3,-1]],"want":[2,5,4]},{"args":[[]],"want":[]},{"args":[[0]],"want":[0]},{"args":[[-2,2]],"want":[-2,0]}]},{"id":"positive-filter","level":2,"title":"양수만 남기기","minutes":2,"concept":"새 리스트 만들기","prompt":"정수 리스트 nums에서 양수만 원래 순서대로 담은 새 리스트를 반환하세요. 입력은 바꾸지 마세요.","signature":"nums","starter":"def solution(nums):\n    ","hints":["비어 있는 결과 리스트에서 시작하세요.","양수는 0보다 큰 값입니다.","조건을 만족할 때만 append하세요. 리스트 컴프리헨션도 가능합니다."],"solution":"def solution(nums):\n    result = []\n    for n in nums:\n        if n > 0:\n            result.append(n)\n    return result","explanation":"값을 선별해 새 리스트에 넣습니다. sorted를 쓰면 원래 순서를 잃을 수 있으니 요구사항을 확인하세요.","variation":"running-sum","tests":[{"args":[[-1,3,0,2]],"want":[3,2]},{"args":[[]],"want":[]},{"args":[[-3,0]],"want":[]},{"args":[[2,2,1]],"want":[2,2,1]}]},{"id":"char-count","level":2,"title":"글자별 출석부","minutes":2,"concept":"딕셔너리","prompt":"영문 소문자 문자열 text에서 각 글자가 몇 번 나오는지 딕셔너리로 반환하세요. 빈 문자열은 {}입니다. 키 순서는 상관없습니다.","signature":"text","starter":"def solution(text):\n    ","hints":["글자를 키, 등장 횟수를 값으로 사용합니다.","처음 등장한 글자의 기존 횟수는 0으로 생각하세요.","counts.get(ch, 0) + 1로 갱신할 수 있습니다."],"solution":"def solution(text):\n    counts = {}\n    for ch in text:\n        counts[ch] = counts.get(ch, 0) + 1\n    return counts","explanation":"아직 없는 키를 0으로 취급하면 첫 등장과 재등장을 같은 코드로 처리할 수 있습니다. collections.Counter를 dict로 바꾸는 풀이도 가능합니다.","variation":"stable-unique","tests":[{"args":["aba"],"want":{"a":2,"b":1}},{"args":[""],"want":{}},{"args":["z"],"want":{"z":1}},{"args":["aaaa"],"want":{"a":4}}]},{"id":"stable-unique","level":2,"title":"처음 나온 순서만","minutes":3,"concept":"중복과 순서","prompt":"정수 리스트 nums의 중복을 제거하되 처음 등장한 순서로 반환하세요. 입력은 바꾸지 마세요.","signature":"nums","starter":"def solution(nums):\n    ","hints":["이미 본 값과 결과의 순서는 다른 역할입니다.","seen 집합과 result 리스트를 함께 사용할 수 있습니다.","seen에 없는 값만 result에 넣고 seen에도 추가하세요."],"solution":"def solution(nums):\n    seen = set()\n    result = []\n    for n in nums:\n        if n not in seen:\n            seen.add(n)\n            result.append(n)\n    return result","explanation":"집합은 중복 확인에 쓰고 리스트는 순서를 보존하는 데 씁니다. dict.fromkeys(nums)를 리스트로 바꾸는 풀이도 가능합니다.","variation":"char-count","tests":[{"args":[[3,1,3,2,1]],"want":[3,1,2]},{"args":[[]],"want":[]},{"args":[[0,0,-1]],"want":[0,-1]},{"args":[[4]],"want":[4]}]},{"id":"pair-sum","level":3,"title":"이웃 둘의 가장 큰 합","minutes":3,"concept":"경계와 순회","prompt":"정수 리스트 nums에서 서로 이웃한 두 수의 합 중 최댓값을 반환하세요. 원소가 2개 미만이면 0입니다. 전부 음수일 수도 있습니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["원소가 부족한 경우를 먼저 처리하세요.","최댓값을 0으로 시작하면 모두 음수인 경우 틀립니다.","첫 두 수의 합으로 시작하고 다음 이웃 쌍들을 비교하세요."],"solution":"def solution(nums):\n    if len(nums) < 2:\n        return 0\n    best = nums[0] + nums[1]\n    for i in range(1, len(nums) - 1):\n        best = max(best, nums[i] + nums[i + 1])\n    return best","explanation":"실제로 존재하는 첫 쌍으로 최댓값을 초기화해야 음수 입력도 처리됩니다. 마지막 인덱스가 범위를 넘지 않는지 확인하세요.","variation":"longest-positive","tests":[{"args":[[2,5,-1,4]],"want":7},{"args":[[]],"want":0},{"args":[[9]],"want":0},{"args":[[-5,-2,-4]],"want":-6},{"args":[[0,0]],"want":0}]},{"id":"longest-positive","level":3,"title":"양수가 이어진 길이","minutes":3,"concept":"연속 구간","prompt":"정수 리스트 nums에서 양수가 연속으로 나오는 가장 긴 구간의 길이를 반환하세요. 0 또는 음수에서 구간이 끊깁니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["현재 구간 길이와 가장 긴 길이를 따로 관리합니다.","양수면 현재 길이를 늘리고, 아니면 0으로 초기화하세요.","매번 best를 현재 길이와 비교해서 갱신하세요."],"solution":"def solution(nums):\n    current = 0\n    best = 0\n    for n in nums:\n        if n > 0:\n            current += 1\n        else:\n            current = 0\n        best = max(best, current)\n    return best","explanation":"현재 구간은 끊길 때 초기화하지만, 최장 기록은 유지합니다. 마지막 구간도 놓치지 않도록 반복 도중 최장 기록을 갱신합니다.","variation":"pair-sum","tests":[{"args":[[1,2,0,3,4,5]],"want":3},{"args":[[]],"want":0},{"args":[[0,-1]],"want":0},{"args":[[1,2,3]],"want":3},{"args":[[1,-1,2]],"want":1}]}];
-  var KEY = 'algo-memory:commute:v1';
+  var CATALOG = [{"id":"even-count","level":1,"title":"짝수만 세기","minutes":1,"concept":"조건과 누적","prompt":"정수 리스트 nums에서 짝수의 개수를 반환하세요. 빈 리스트라면 0입니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["개수를 담는 값을 0에서 시작해 보세요.","짝수는 2로 나눈 나머지가 0입니다.","리스트를 돌며 조건을 만족할 때만 개수를 1 늘리세요."],"solution":"def solution(nums):\n    count = 0\n    for n in nums:\n        if n % 2 == 0:\n            count += 1\n    return count","explanation":"조건을 만족하는 원소마다 개수를 하나씩 올립니다. 0과 음의 짝수도 세어야 합니다. sum(n % 2 == 0 for n in nums)처럼 다른 합법적인 풀이도 가능합니다.","variation":"odd-sum","tests":[{"args":[[1,2,4,7]],"want":2},{"args":[[]],"want":0},{"args":[[0,-2,-3]],"want":2},{"args":[[1,3]],"want":0}]},{"id":"odd-sum","level":1,"title":"홀수만 더하기","minutes":1,"concept":"조건과 누적","prompt":"정수 리스트 nums에서 홀수만 더한 값을 반환하세요. 빈 리스트라면 0입니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["이번에는 개수가 아니라 합계를 누적합니다.","홀수의 조건은 n % 2 != 0 입니다.","조건을 만족하면 합계에 현재 숫자를 더하세요."],"solution":"def solution(nums):\n    total = 0\n    for n in nums:\n        if n % 2 != 0:\n            total += n\n    return total","explanation":"홀수인 원소만 합계에 더합니다. 음의 홀수도 빠뜨리지 마세요. 짝수 개수 문제에서 조건과 누적 대상을 바꾼 작은 변형입니다.","variation":"even-count","tests":[{"args":[[1,2,3,4]],"want":4},{"args":[[]],"want":0},{"args":[[-3,-2,5]],"want":2},{"args":[[0,2]],"want":0}]},{"id":"clamp-score","level":1,"title":"점수를 범위 안으로","minutes":1,"concept":"조건 분기","prompt":"정수 score가 0보다 작으면 0, 100보다 크면 100, 나머지는 원래 값을 반환하세요.","signature":"score","starter":"def solution(score):\n    ","hints":["범위 밖인 두 경우를 먼저 나누세요.","경계값 0과 100은 그대로 반환합니다.","마지막 경우에는 원래 score를 반환하면 됩니다."],"solution":"def solution(score):\n    if score < 0:\n        return 0\n    if score > 100:\n        return 100\n    return score","explanation":"아래 경계와 위 경계를 각각 처리합니다. min(100, max(0, score))도 같은 계약을 만족하는 풀이입니다.","variation":"first-positive","tests":[{"args":[135],"want":100},{"args":[-1],"want":0},{"args":[0],"want":0},{"args":[100],"want":100},{"args":[73],"want":73}]},{"id":"first-positive","level":1,"title":"첫 양수 찾기","minutes":2,"concept":"조기 반환","prompt":"정수 리스트 nums에서 처음 나오는 양수를 반환하세요. 양수가 없으면 0을 반환하세요. 0은 양수가 아닙니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["왼쪽부터 순서대로 확인하세요.","n > 0이면 더 찾지 않고 바로 반환할 수 있습니다.","끝까지 찾지 못한 경우의 return은 반복문 밖에 둡니다."],"solution":"def solution(nums):\n    for n in nums:\n        if n > 0:\n            return n\n    return 0","explanation":"첫 번째만 필요하므로 발견한 순간 반환합니다. 실패 시 반환을 반복문 안에 두면 뒤의 양수를 확인하지 못합니다.","variation":"clamp-score","tests":[{"args":[[-2,0,4,3]],"want":4},{"args":[[]],"want":0},{"args":[[-1,0]],"want":0},{"args":[[2,1]],"want":2},{"args":[[2,7]],"want":2}]},{"id":"running-sum","level":2,"title":"지금까지의 합","minutes":2,"concept":"누적합","prompt":"정수 리스트 nums의 각 위치까지의 합을 새 리스트로 반환하세요. 예: [2, 3, -1] → [2, 5, 4]. 원본 리스트는 바꾸지 마세요.","signature":"nums","starter":"def solution(nums):\n    ","hints":["지금까지의 합과 결과 리스트가 각각 필요합니다.","현재 숫자를 합계에 더한 다음 결과에 넣으세요.","append(total)을 반복문 안에서 실행합니다."],"solution":"def solution(nums):\n    total = 0\n    result = []\n    for n in nums:\n        total += n\n        result.append(total)\n    return result","explanation":"원소를 더한 직후의 합계를 차례대로 저장합니다. 입력을 직접 수정하지 않아야 빈 입력이나 반복 호출도 다루기 쉽습니다.","variation":"positive-filter","tests":[{"args":[[2,3,-1]],"want":[2,5,4]},{"args":[[]],"want":[]},{"args":[[0]],"want":[0]},{"args":[[-2,2]],"want":[-2,0]}],"preserveInput":true},{"id":"positive-filter","level":2,"title":"양수만 남기기","minutes":2,"concept":"새 리스트 만들기","prompt":"정수 리스트 nums에서 양수만 원래 순서대로 담은 새 리스트를 반환하세요. 입력은 바꾸지 마세요.","signature":"nums","starter":"def solution(nums):\n    ","hints":["비어 있는 결과 리스트에서 시작하세요.","양수는 0보다 큰 값입니다.","조건을 만족할 때만 append하세요. 리스트 컴프리헨션도 가능합니다."],"solution":"def solution(nums):\n    result = []\n    for n in nums:\n        if n > 0:\n            result.append(n)\n    return result","explanation":"값을 선별해 새 리스트에 넣습니다. sorted를 쓰면 원래 순서를 잃을 수 있으니 요구사항을 확인하세요.","variation":"running-sum","tests":[{"args":[[-1,3,0,2]],"want":[3,2]},{"args":[[]],"want":[]},{"args":[[-3,0]],"want":[]},{"args":[[2,2,1]],"want":[2,2,1]}],"preserveInput":true},{"id":"char-count","level":2,"title":"글자별 출석부","minutes":2,"concept":"딕셔너리","prompt":"영문 소문자 문자열 text에서 각 글자가 몇 번 나오는지 딕셔너리로 반환하세요. 빈 문자열은 {}입니다. 키 순서는 상관없습니다.","signature":"text","starter":"def solution(text):\n    ","hints":["글자를 키, 등장 횟수를 값으로 사용합니다.","처음 등장한 글자의 기존 횟수는 0으로 생각하세요.","counts.get(ch, 0) + 1로 갱신할 수 있습니다."],"solution":"def solution(text):\n    counts = {}\n    for ch in text:\n        counts[ch] = counts.get(ch, 0) + 1\n    return counts","explanation":"아직 없는 키를 0으로 취급하면 첫 등장과 재등장을 같은 코드로 처리할 수 있습니다. collections.Counter를 dict로 바꾸는 풀이도 가능합니다.","variation":"stable-unique","tests":[{"args":["aba"],"want":{"a":2,"b":1}},{"args":[""],"want":{}},{"args":["z"],"want":{"z":1}},{"args":["aaaa"],"want":{"a":4}}]},{"id":"stable-unique","level":2,"title":"처음 나온 순서만","minutes":3,"concept":"중복과 순서","prompt":"정수 리스트 nums의 중복을 제거하되 처음 등장한 순서로 반환하세요. 입력은 바꾸지 마세요.","signature":"nums","starter":"def solution(nums):\n    ","hints":["이미 본 값과 결과의 순서는 다른 역할입니다.","seen 집합과 result 리스트를 함께 사용할 수 있습니다.","seen에 없는 값만 result에 넣고 seen에도 추가하세요."],"solution":"def solution(nums):\n    seen = set()\n    result = []\n    for n in nums:\n        if n not in seen:\n            seen.add(n)\n            result.append(n)\n    return result","explanation":"집합은 중복 확인에 쓰고 리스트는 순서를 보존하는 데 씁니다. dict.fromkeys(nums)를 리스트로 바꾸는 풀이도 가능합니다.","variation":"char-count","tests":[{"args":[[3,1,3,2,1]],"want":[3,1,2]},{"args":[[]],"want":[]},{"args":[[0,0,-1]],"want":[0,-1]},{"args":[[4]],"want":[4]}],"preserveInput":true},{"id":"pair-sum","level":3,"title":"이웃 둘의 가장 큰 합","minutes":3,"concept":"경계와 순회","prompt":"정수 리스트 nums에서 서로 이웃한 두 수의 합 중 최댓값을 반환하세요. 원소가 2개 미만이면 0입니다. 전부 음수일 수도 있습니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["원소가 부족한 경우를 먼저 처리하세요.","최댓값을 0으로 시작하면 모두 음수인 경우 틀립니다.","첫 두 수의 합으로 시작하고 다음 이웃 쌍들을 비교하세요."],"solution":"def solution(nums):\n    if len(nums) < 2:\n        return 0\n    best = nums[0] + nums[1]\n    for i in range(1, len(nums) - 1):\n        best = max(best, nums[i] + nums[i + 1])\n    return best","explanation":"실제로 존재하는 첫 쌍으로 최댓값을 초기화해야 음수 입력도 처리됩니다. 마지막 인덱스가 범위를 넘지 않는지 확인하세요.","variation":"longest-positive","tests":[{"args":[[2,5,-1,4]],"want":7},{"args":[[]],"want":0},{"args":[[9]],"want":0},{"args":[[-5,-2,-4]],"want":-6},{"args":[[0,0]],"want":0}]},{"id":"longest-positive","level":3,"title":"양수가 이어진 길이","minutes":3,"concept":"연속 구간","prompt":"정수 리스트 nums에서 양수가 연속으로 나오는 가장 긴 구간의 길이를 반환하세요. 0 또는 음수에서 구간이 끊깁니다.","signature":"nums","starter":"def solution(nums):\n    ","hints":["현재 구간 길이와 가장 긴 길이를 따로 관리합니다.","양수면 현재 길이를 늘리고, 아니면 0으로 초기화하세요.","매번 best를 현재 길이와 비교해서 갱신하세요."],"solution":"def solution(nums):\n    current = 0\n    best = 0\n    for n in nums:\n        if n > 0:\n            current += 1\n        else:\n            current = 0\n        best = max(best, current)\n    return best","explanation":"현재 구간은 끊길 때 초기화하지만, 최장 기록은 유지합니다. 마지막 구간도 놓치지 않도록 반복 도중 최장 기록을 갱신합니다.","variation":"pair-sum","tests":[{"args":[[1,2,0,3,4,5]],"want":3},{"args":[[]],"want":0},{"args":[[0,-1]],"want":0},{"args":[[1,2,3]],"want":3},{"args":[[1,-1,2]],"want":1}]}];
+  var KEY = 'algo-memory:commute:v2', LEGACY_KEY = 'algo-memory:commute:v1';
   function date() {
     var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
   function plus(day, n) { var p = day.split('-').map(Number), d = new Date(p[0], p[1] - 1, p[2] + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-  function empty() { return { version: 1, level: 1, consecutive: 0, autoIndent: true, records: {}, drafts: {} }; }
+  function empty() { return { version: 2, level: 1, consecutive: 0, autoIndent: true, records: {}, drafts: {} }; }
   function valid(o) {
-    var base = !!o && o.version === 1 && Number.isInteger(o.level) && o.level >= 1 && o.level <= 3 &&
+    var base = !!o && (o.version === 1 || o.version === 2) && Number.isInteger(o.level) && o.level >= 1 && o.level <= 3 &&
       Number.isInteger(o.consecutive) && o.consecutive >= 0 && typeof o.autoIndent === 'boolean' &&
       !!o.records && typeof o.records === 'object' && !Array.isArray(o.records) &&
       !!o.drafts && typeof o.drafts === 'object' && !Array.isArray(o.drafts);
@@ -1149,22 +1355,45 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
           Array.isArray(r.attempts) && r.attempts.length <= 80 && r.attempts.every(function (a) {
             return !!a && Number.isFinite(a.time) && typeof a.day === 'string' && day.test(a.day) &&
               Number.isInteger(a.hints) && a.hints >= 0 && a.hints <= 3 &&
-              Number.isInteger(a.seconds) && a.seconds >= 0 && a.verified === false &&
+              Number.isInteger(a.seconds) && a.seconds >= 0 && typeof a.verified === 'boolean' &&
               typeof a.solutionSeen === 'boolean' && typeof a.exposed === 'boolean' && typeof a.independent === 'boolean' &&
-              (a.outcome === 'self-pass' || a.outcome === 'review');
+              ((a.verified === false && (a.outcome === 'self-pass' || a.outcome === 'review')) ||
+                (o.version === 2 && ['passed','wrong-answer','syntax-error','runtime-error','timeout'].includes(a.outcome) &&
+                  a.method === 'python-tests' && a.engine === 'pyodide-0.29.4' && a.verified === (a.outcome === 'passed')));
           });
       }) && Object.values(o.drafts).every(function (d) {
         return !!d && typeof d.code === 'string' && d.code.length <= 50000 && Number.isFinite(d.startedAt) &&
           Number.isInteger(d.hints) && d.hints >= 0 && d.hints <= 3 &&
           typeof d.submitted === 'boolean' && typeof d.solutionSeen === 'boolean' && typeof d.exposed === 'boolean' &&
-          (!d.submitted || (typeof d.submittedCode === 'string' && Number.isInteger(d.submittedSeconds) && d.submittedSeconds >= 0));
+          (!d.submitted || (typeof d.submittedCode === 'string' && Number.isInteger(d.submittedSeconds) && d.submittedSeconds >= 0)) &&
+          (!d.execution || validExecution(d.execution));
       });
+  }
+  function validExecution(r) {
+    if (!r || !['passed','wrong-answer','syntax-error','runtime-error','timeout','load-error','network-error','cancelled'].includes(r.status)) return false;
+    if (r.detail !== undefined && (typeof r.detail !== 'string' || r.detail.length > 500)) return false;
+    if (r.rows !== undefined) {
+      if (!Array.isArray(r.rows) || !Number.isInteger(r.total) || r.total < 1 || r.total > 20 || r.rows.length !== r.total ||
+        !Number.isInteger(r.passed) || r.passed < 0 || r.passed > r.total) return false;
+      if (!r.rows.every(function (row) { return !!row && typeof row.ok === 'boolean' &&
+        (row.actual === undefined || (typeof row.actual === 'string' && row.actual.length <= 500)) &&
+        (row.error === undefined || (typeof row.error === 'string' && row.error.length <= 500)); })) return false;
+    }
+    return r.status !== 'passed' || (!!r.rows && r.passed === r.total && r.rows.every(function (row) { return row.ok; }));
+  }
+  function migrate(o) {
+    var copy = JSON.parse(JSON.stringify(o));
+    if (copy.version === 1) {
+      copy.version = 2; copy.consecutive = 0;
+      Object.values(copy.records).forEach(function (r) { r.legacyStage = r.stage; r.stage = 0; });
+    }
+    return copy;
   }
   function plan(record, attempt, day) {
     var stage = Math.max(0, Math.min(5, Number(record.stage) || 0));
-    var independent = attempt.outcome === 'self-pass' && attempt.hints === 0 && !attempt.solutionSeen && !attempt.exposed;
+    var independent = attempt.verified === true && attempt.outcome === 'passed' && attempt.hints === 0 && !attempt.solutionSeen && !attempt.exposed;
     if (independent) stage = Math.min(5, stage + 1);
-    else if (attempt.outcome === 'review') stage = 0;
+    else if (['review','wrong-answer','syntax-error','runtime-error','timeout'].includes(attempt.outcome)) stage = 0;
     var gap = independent ? [1, 3, 7, 14, 30][Math.max(0, stage - 1)] : 1;
     return { stage: stage, due: plus(day, gap), independent: independent };
   }
@@ -1176,10 +1405,11 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     if (/\t/.test(code)) messages.push('탭과 공백을 섞지 않았는지 확인하세요.');
     return messages;
   }
-  // No Python/JavaScript eval: this MVP records self-assessment, never execution success.
+  // Python answers run only in the separate opaque sandbox/Worker owned by AlgoPython.
   function attach(host, options) {
     var win = host.ownerDocument.defaultView, doc = host.ownerDocument;
     var state = empty(), warning = '', readOnly = false, active = null, editor = null;
+    var runner = null, busy = false, runToken = 0, preservedRaw = null;
     var store;
     try { store = options.storage || win.localStorage; }
     catch (e) { store = { getItem: function () { throw e; }, setItem: function () { throw e; } }; }
@@ -1187,10 +1417,15 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function load() {
       try {
         var raw = store.getItem(KEY);
+        if (!raw) raw = store.getItem(LEGACY_KEY);
+        preservedRaw = raw;
         if (!raw) return;
         var parsed = JSON.parse(raw);
         if (!valid(parsed)) throw new Error('version');
-        state = parsed;
+        state = migrate(parsed);
+        Object.values(state.drafts).forEach(function (d) {
+          if (d.execution && !['passed','wrong-answer','syntax-error','runtime-error','timeout','load-error','network-error','cancelled'].includes(d.execution.status)) delete d.execution;
+        });
       } catch (e) {
         readOnly = true; warning = '저장 기록을 읽지 못했습니다. 원본을 덮어쓰지 않고 이번 화면에서만 연습합니다. 백업을 먼저 보관하세요.';
       }
@@ -1224,10 +1459,14 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     }
     function banner() { return '<p id="cm-warning" class="cm-warning" role="status"' + (warning ? '' : ' hidden') + '>' + esc(warning) + '</p>'; }
     function label(a) {
+      if (a.outcome === 'passed' && a.verified) return a.independent ? '독립 실행 통과' : '도움 후 실행 통과';
+      var labels = { 'wrong-answer': '테스트 오답', 'syntax-error': '문법 오류', 'runtime-error': '실행 오류', timeout: '시간 초과' };
+      if (labels[a.outcome]) return labels[a.outcome];
       if (a.outcome === 'review') return '다시 볼 것';
       return a.independent ? '독립 자가 확인' : '도움 후 자가 확인';
     }
     function home() {
+      stop();
       active = null; editor = null;
       var T = date(), due = [], fresh = [], upcoming = [];
       CATALOG.forEach(function (q) {
@@ -1244,23 +1483,23 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         return items.length ? items.map(function (q) {
           var r = record(q.id), d = state.drafts[q.id];
           return '<button class="cm-question" data-cm="open" data-id="' + esc(q.id) + '"><span><strong>' + esc(q.title) + '</strong>' +
-            '<span class="cm-meta">L' + q.level + ' · ' + esc(q.concept) + (d ? ' · 작성 중' : '') +
+            '<span class="cm-meta">L' + q.level + ' · ' + esc(q.concept) + (d ? (d.recorded ? ' · 최근 실행 결과' : ' · 작성 중') : '') +
             (r.due ? ' · ' + esc(r.due) : '') + '</span></span><span class="cm-time">' + q.minutes + '분 <span aria-hidden="true">›</span></span></button>';
         }).join('') : '<p class="cm-note">' + emptyText + '</p>';
       }
       host.innerHTML = '<div class="cm-shell">' + banner() +
         '<div class="cm-hero"><div class="chip accent">통근 연습 · Python</div><h1>이번 정거장엔 한 문제</h1>' +
         '<p>1~3분 목표로 짧은 함수를 직접 써 보세요.<br>필요할 때 힌트 하나, 제출 뒤 해설을 엽니다.</p></div>' +
-        '<div class="cm-contract"><strong>자가 확인 모드</strong><p>Python을 실행하지 않습니다. 입출력 확인표와 해설로 직접 판단합니다. 모든 기록은 PC 암기 점수와 별개입니다.</p></div>' +
+        '<div class="cm-contract"><strong>Python 입력·출력 채점</strong><p>격리된 Worker에서 테스트합니다. 최초 실행은 공식 Pyodide 0.29.4 파일 약 12.3MB를 내려받습니다(압축 전 합계). 실행 제한은 3초이며, PC 암기 점수와 별개로 기록합니다.</p></div>' +
         '<div class="cm-level"><label for="cm-level">연습 난이도</label><select id="cm-level"><option value="1">L1 · 조건과 반복</option><option value="2">L2 · 리스트와 딕셔너리</option><option value="3">L3 · 경계와 구간</option></select></div>' +
-        '<p class="cm-note">독립 자가 확인을 3분 안에 2번 연속 하면 한 단계 올립니다. 다시 볼 문제는 한 단계 낮추고 내일 먼저 꺼냅니다.</p>' +
+        '<p class="cm-note">3분 안에 독립 실행 통과 2회면 한 단계 올립니다. 오답은 한 단계 낮추고 내일 먼저 꺼냅니다. 자가 확인은 실행 정답으로 승격하지 않습니다.</p>' +
         '<h2>오늘 복습 <span class="cm-count">' + due.length + '</span></h2><div class="cm-list">' + list(due, '오늘 예정된 복습이 없습니다.') + '</div>' +
         '<h2>짧게 새로 풀기</h2><div class="cm-list">' + list(fresh, '이 단계의 새 문제를 모두 확인했습니다. 난이도를 선택하거나 예정 문제를 다시 연습하세요.') + '</div>' +
         (upcoming.length ? '<details class="cm-fold"><summary>예정된 문제 · 미리 연습하기 (' + upcoming.length + ')</summary><div class="cm-list">' + list(upcoming, '') + '</div></details>' : '') +
         (recent.length ? '<h2>최근 기록</h2><ul class="cm-history">' + recent.slice(0, 8).map(function (row) {
-          return '<li><strong>' + esc(row.q.title) + '</strong><span>' + esc(label(row.a)) + ' · 힌트 ' + row.a.hints + '개 · ' + row.a.seconds + '초 · ' + esc(row.a.day) + '</span><small>실행 미검증</small></li>';
+          return '<li><strong>' + esc(row.q.title) + '</strong><span>' + esc(label(row.a)) + ' · 힌트 ' + row.a.hints + '개 · ' + row.a.seconds + '초 · ' + esc(row.a.day) + '</span><small>' + (row.a.method === 'python-tests' ? 'Python 테스트 · ' + (row.a.verified ? '실행 통과' : '통과하지 못함') : '자가 확인 · 실행 미검증') + '</small></li>';
         }).join('') + '</ul>' : '') +
-        '<details class="cm-fold"><summary>저장과 백업</summary><p class="cm-note">통근 기록·초안은 이 브라우저에만 저장됩니다. 자동 기기 동기화는 없습니다. JSON으로 옮길 수 있습니다. 처음 받은 HTML 파일은 네트워크 없이 연습할 수 있으나 웹사이트의 오프라인 재방문은 보장하지 않습니다.</p>' +
+        '<details class="cm-fold"><summary>저장과 백업</summary><p class="cm-note">통근 기록·초안은 이 브라우저에만 저장됩니다. JSON으로 옮길 수 있습니다. 브라우저가 검증된 런타임 파일을 보관한 경우에만 오프라인 실행할 수 있습니다. 저장 공간 정리나 시크릿 모드에서는 다시 다운로드가 필요할 수 있습니다. 실행 없이 자가 확인도 가능합니다.</p>' +
         '<button class="btn" data-cm="export">통근 JSON 백업</button><label class="cm-file">통근 JSON 복원<input id="cm-import" type="file" accept="application/json,.json"></label><textarea id="cm-backup" aria-label="통근 백업 JSON" readonly hidden></textarea></details>' +
         '<p class="cm-note" id="cm-save-status" role="status">' + (readOnly ? '기존 기록 보호 중 · 저장하지 않음' : '저장 위치: 이 브라우저 · PC 기록과 분리') + '</p></div>';
       host.querySelector('#cm-level').value = state.level;
@@ -1278,7 +1517,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         q.tests.map(function (t) { return '<tr><td><code>' + esc(JSON.stringify(t.args).slice(1, -1)) + '</code></td><td><code>' + esc(JSON.stringify(t.want)) + '</code></td></tr>'; }).join('') + '</tbody></table></div>';
     }
     function open(id) {
-      snapshot(); active = id;
+      snapshot(); stop(); active = id;
       var q = question(id); if (!q) { home(); return; }
       var d = draft(id);
       host.innerHTML = '<div class="cm-shell cm-solve">' + banner() +
@@ -1287,7 +1526,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         '<p class="cm-example"><strong>예시</strong> <code>solution(' + esc(JSON.stringify(q.tests[0].args).slice(1, -1)) + ') → ' + esc(JSON.stringify(q.tests[0].want)) + '</code></p></div>' +
         '<div class="cm-hints"><button class="btn" data-cm="hint"' + (d.hints >= q.hints.length ? ' disabled' : '') + '>힌트 하나 ' + d.hints + '/' + q.hints.length + '</button>' +
         '<ol id="cm-hints">' + q.hints.slice(0, d.hints).map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ol></div>' +
-        '<label class="cm-editor-label" for="cm-code">내 Python 함수 <span>실행 미검증</span></label>' +
+        '<label class="cm-editor-label" for="cm-code">내 Python 함수 <span>격리 실행 · 제한 3초</span></label>' +
         '<div class="cm-edit-options"><label><input id="cm-auto" type="checkbox"' + (state.autoIndent ? ' checked' : '') + '> 자동 들여쓰기</label><span id="cm-save-status" role="status"></span></div>' +
         '<div class="cm-editor"><textarea id="cm-code" maxlength="50000" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" wrap="off" aria-describedby="cm-editor-help"></textarea>' +
         '<div class="cm-toolbar" role="toolbar" aria-label="코드 입력 도구">' +
@@ -1295,13 +1534,15 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         [['()','괄호'],['[]','대괄호'],['{}','중괄호'],['""','큰따옴표'],["''",'작은따옴표']].map(function (x) { return '<button type="button" data-edit="pair" data-token="' + esc(x[0]) + '" aria-label="' + x[1] + ' 입력">' + esc(x[0]) + '</button>'; }).join('') +
         [':', '=', ',', '+', '-', '*', '%', '<', '>'].map(function (s) { return '<button type="button" data-edit="insert" data-token="' + esc(s) + '" aria-label="' + esc(s) + ' 입력">' + esc(s) + '</button>'; }).join('') +
         '</div></div><p class="cm-note" id="cm-editor-help">블록 뒤 Enter는 4칸 더, 보통 줄은 들여쓰기를 유지합니다. Tab / Shift+Tab도 가능합니다. 입력 바는 옆으로 밀어 사용할 수 있습니다.</p>' +
-        '<div class="cm-actions"><button class="btn accent" data-cm="submit">제출 · 확인표 열기</button><span id="cm-inline" role="status"></span></div>' +
+        '<p class="cm-note">처음 실행할 때 런타임 약 12.3MB(압축 전)를 받습니다. 받은 코드·답안은 외부 서버로 전송하지 않습니다.</p>' +
+        '<div class="cm-actions"><button class="btn accent" data-cm="submit">Python 실행 · 채점</button><button class="btn" data-cm="stop" hidden>실행 중단</button><button class="btn ghost" data-cm="self-check">실행 없이 자가 확인</button><span id="cm-inline" role="status"></span></div>' +
+        '<p id="cm-run-status" class="cm-note" role="status" aria-live="polite"></p>' +
         '<section id="cm-feedback" class="cm-feedback" aria-live="polite"></section></div>';
       var ta = host.querySelector('#cm-code'); ta.value = d.code;
       ta.setSelectionRange(Math.min(d.start || 0, d.code.length), Math.min(d.end || 0, d.code.length));
       editor = win.CommuteEditor.attach(ta, { enabled: function () { return state.autoIndent; }, change: function (s) {
         d.code = s.value; d.start = s.start; d.end = s.end;
-        if (d.submitted && d.submittedCode !== s.value) { d.submitted = false; host.querySelector('#cm-feedback').innerHTML = ''; }
+        if (d.submitted && d.submittedCode !== s.value) { d.submitted = false; delete d.execution; d.recorded = false; d.startedAt = Date.now(); host.querySelector('#cm-feedback').innerHTML = ''; }
         persist();
       } });
       if (d.submitted) feedback();
@@ -1309,6 +1550,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     }
     function feedback() {
       var q = question(active), d = draft(active), box = host.querySelector('#cm-feedback');
+      if (d.execution) { executionFeedback(q, d, box); return; }
       var warnings = inspect(d.code);
       box.innerHTML = '<h2>이 입력들을 손으로 따라가 보세요</h2><p>자동 채점이 아닙니다. 아래 표는 기대값이며, 내 코드의 실행 결과가 아닙니다. 다른 변수명과 풀이도 괜찮습니다.</p>' +
         (warnings.length ? '<p class="cm-warning">정적 확인: ' + warnings.map(esc).join(' ') + ' (정답 판정 아님)</p>' : '<p class="cm-note">기본 형태만 확인했습니다. 문법·실행·정답은 검증하지 않았습니다.</p>') +
@@ -1323,10 +1565,10 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       if (!d.submitted || d.submittedCode !== d.code) return;
       var r = record(active), a = { time: Date.now(), day: date(), hints: d.hints, solutionSeen: !!d.solutionSeen,
         exposed: !!d.exposed, seconds: d.submittedSeconds, outcome: outcome, verified: false };
-      var next = plan(r, a, date()); a.independent = next.independent;
+      var next = plan(r, a, date()); a.independent = outcome === 'self-pass' && !a.hints && !a.solutionSeen && !a.exposed;
       r.attempts = r.attempts.concat([a]).slice(-80); r.stage = next.stage; r.due = next.due;
       state.records[active] = r;
-      if (a.independent && a.seconds <= 180) {
+      if (a.verified && a.independent && a.seconds <= 180) {
         state.consecutive++; if (state.consecutive >= 2) { state.level = Math.min(3, state.level + 1); state.consecutive = 0; }
       } else { state.consecutive = 0; if (outcome === 'review') state.level = Math.max(1, state.level - 1); }
       delete state.drafts[active]; editor = null;
@@ -1337,6 +1579,65 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       host.querySelectorAll('[data-edit],#cm-auto,[data-cm="hint"]').forEach(function (el) { el.disabled = true; });
       host.querySelector('#cm-code').readOnly = true;
     }
+    function stop() {
+      runToken++; if (runner) runner.cancel(); busy = false;
+      var ta = host.querySelector('#cm-code'), submit = host.querySelector('[data-cm="submit"]'), stopButton = host.querySelector('[data-cm="stop"]');
+      if (ta) ta.readOnly = false;
+      if (submit) submit.disabled = false;
+      if (stopButton) stopButton.hidden = true;
+      host.querySelectorAll('[data-edit]').forEach(function (el) { el.disabled = false; });
+    }
+    var RUN_LABELS = { passed: '실행 테스트 통과', 'wrong-answer': '테스트 오답', 'syntax-error': '문법 오류', 'runtime-error': '실행 오류', timeout: '실행 시간 초과', 'load-error': '실행기 로딩 실패', 'network-error': '네트워크 연결 실패', cancelled: '실행 중단' };
+    function executionFeedback(q, d, box) {
+      var r = d.execution;
+      box.innerHTML = '<h2>' + esc(RUN_LABELS[r.status] || '실행 결과') + '</h2>' +
+        (r.detail ? '<p>' + esc(r.detail) + (r.line ? ' · ' + Number(r.line) + '번째 줄' : '') + '</p>' : '') +
+        (r.rows ? '<p>' + r.passed + '/' + r.total + '개 입력 통과 · 제공된 테스트 결과이며 모든 가능한 입력의 정답을 보장하지 않습니다.</p><div class="cm-table"><table><caption>실제 Python 실행 결과</caption><thead><tr><th>입력</th><th>기대값</th><th>내 반환값</th></tr></thead><tbody>' + r.rows.map(function (row, i) {
+          var test = q.tests[i];
+          return '<tr><td><code>' + esc(JSON.stringify(test.args).slice(1,-1)) + '</code></td><td><code>' + esc(JSON.stringify(test.want)) + '</code></td><td>' + (row.ok ? '✓ ' : '✕ ') + '<code>' + esc(row.error || row.actual || '') + '</code>' + (row.mutated ? '<br>입력 리스트를 변경했습니다.' : '') + '</td></tr>';
+        }).join('') + '</tbody></table></div>' : '') +
+        '<p class="cm-note">' + (d.recorded ? '이번 실행은 기록했습니다. 다음 복습: ' + esc(record(active).due) : '실행 준비·연결·중단 오류는 학습 오답으로 기록하지 않습니다.') + '</p>' +
+        '<button class="btn" data-cm="solution"' + (d.solutionSeen ? ' hidden' : '') + '>모범 풀이와 해설 보기</button><div id="cm-solution">' +
+        (d.solutionSeen ? '<pre class="code">' + esc(q.solution) + '</pre><p>' + esc(q.explanation) + '</p>' : '') + '</div>' +
+        '<div class="cm-result-actions"><button class="btn accent" data-cm="retry" data-id="' + q.id + '">고쳐서 다시 풀기</button>' +
+        (r.status === 'passed' ? '<button class="btn" data-cm="open" data-id="' + q.variation + '">작은 변형 풀기</button>' : '') + '<button class="btn" data-cm="home">오늘 목록</button></div>';
+    }
+    function recordExecution(d) {
+      if (d.recorded || !['passed','wrong-answer','syntax-error','runtime-error','timeout'].includes(d.execution.status)) return;
+      var r = record(active), result = d.execution;
+      var a = { time: Date.now(), day: date(), hints: d.hints, solutionSeen: !!d.solutionSeen, exposed: !!d.exposed,
+        seconds: d.submittedSeconds, outcome: result.status, verified: result.status === 'passed', method: 'python-tests', engine: 'pyodide-0.29.4' };
+      var next = plan(r, a, date()); a.independent = next.independent;
+      r.attempts = r.attempts.concat([a]).slice(-80); r.stage = next.stage; r.due = next.due; state.records[active] = r;
+      if (a.independent && a.seconds <= 180) { state.consecutive++; if (state.consecutive >= 2) { state.level = Math.min(3, state.level + 1); state.consecutive = 0; } }
+      else { state.consecutive = 0; if (result.status !== 'passed') state.level = Math.max(1, state.level - 1); }
+      d.recorded = true;
+    }
+    async function execute() {
+      if (busy || (editor && editor.composing())) return;
+      snapshot(); var d = draft(active), id = active, q = question(active);
+      if (!d.code.trim() || d.code.trim() === q.starter.trim()) { host.querySelector('#cm-inline').textContent = '함수의 내용을 먼저 작성해 주세요.'; return; }
+      if (d.recorded && d.submittedCode === d.code) { feedback(); return; }
+      stop(); var token = runToken; busy = true;
+      d.submitted = true; d.submittedCode = d.code; d.submittedSeconds = Math.max(0, Math.floor((Date.now() - d.startedAt) / 1000)); delete d.execution;
+      host.querySelector('#cm-code').readOnly = true; host.querySelector('[data-cm="submit"]').disabled = true; host.querySelector('[data-cm="stop"]').hidden = false;
+      host.querySelectorAll('[data-edit]').forEach(function (el) { el.disabled = true; });
+      host.querySelector('#cm-feedback').innerHTML = ''; persist();
+      var result;
+      try {
+        if (!runner) runner = win.AlgoPython.create(win);
+        result = await runner.run(d.code, q.tests, !!q.preserveInput, function (p) {
+          if (runToken !== token) return;
+          var status = host.querySelector('#cm-run-status');
+          if (status) status.textContent = p.status === 'downloading' ? '런타임 준비 ' + p.loaded + '/' + p.total + ' · 최초 약 12.3MB' : (p.status === 'running' ? 'Python 실행 중 · 제한 3초' : '격리된 Python 초기화 중');
+        });
+      } catch (e) { result = { status: 'load-error', detail: '실행기를 시작하지 못했습니다. 다시 시도하세요.' }; }
+      if (token !== runToken || active !== id) return;
+      if (!validExecution(result) || (result.rows && result.rows.length !== q.tests.length)) result = { status: 'load-error', detail: '실행 결과 형식이 올바르지 않습니다.' };
+      stop(); d.execution = result; recordExecution(d); persist(); feedback();
+      host.querySelector('#cm-run-status').textContent = RUN_LABELS[result.status] || '실행 완료';
+      host.querySelector('#cm-feedback').scrollIntoView({ block: 'start', behavior: 'auto' });
+    }
     host.addEventListener('pointerdown', function (e) {
       if (e.target.closest('[data-edit]') && doc.activeElement === host.querySelector('#cm-code')) e.preventDefault();
     });
@@ -1346,18 +1647,26 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       var el = e.target.closest('[data-cm]'); if (!el || el.disabled) return;
       var action = el.dataset.cm;
       if (action === 'home') { snapshot(); persist(); home(); }
-      else if (action === 'open' || action === 'retry') { open(el.dataset.id); }
+      else if (action === 'open' || action === 'retry') {
+        if (action === 'retry' && state.drafts[el.dataset.id]) {
+          var retryDraft = state.drafts[el.dataset.id]; retryDraft.submitted = false; retryDraft.recorded = false; delete retryDraft.execution; retryDraft.startedAt = Date.now();
+        }
+        open(el.dataset.id);
+      }
       else if (action === 'hint') {
         var q = question(active), d = draft(active); if (d.hints >= q.hints.length) return;
         var li = doc.createElement('li'); li.textContent = q.hints[d.hints++]; host.querySelector('#cm-hints').appendChild(li);
         el.textContent = '힌트 하나 ' + d.hints + '/' + q.hints.length; el.disabled = d.hints === q.hints.length;
         revealExposure(d); if (d.submitted) feedback(); persist();
-      } else if (action === 'submit') {
+      } else if (action === 'submit') { execute(); }
+      else if (action === 'stop') { stop(); host.querySelector('#cm-run-status').textContent = '실행을 중단했습니다. 다시 실행할 수 있습니다.'; }
+      else if (action === 'self-check') {
+        if (busy) return;
         if (editor && editor.composing()) return;
         snapshot(); var dd = draft(active);
         if (!dd.code.trim() || dd.code.trim() === question(active).starter.trim()) { host.querySelector('#cm-inline').textContent = '함수의 내용을 먼저 작성해 주세요.'; return; }
         if (!dd.submitted) { dd.submittedSeconds = Math.max(0, Math.floor((Date.now() - dd.startedAt) / 1000)); }
-        dd.submitted = true; dd.submittedCode = dd.code; feedback(); persist();
+        dd.submitted = true; dd.submittedCode = dd.code; delete dd.execution; feedback(); persist();
         host.querySelector('#cm-feedback').scrollIntoView({ block: 'start', behavior: 'auto' });
       } else if (action === 'solution') {
         var ds = draft(active); if (!ds.submitted) return;
@@ -1366,7 +1675,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       else if (action === 'export') {
         var backup = host.querySelector('#cm-backup');
         backup.hidden = false;
-        var rawBackup; try { rawBackup = readOnly ? store.getItem(KEY) : JSON.stringify(state, null, 2); } catch (err) { rawBackup = null; }
+        var rawBackup; try { rawBackup = readOnly ? preservedRaw : JSON.stringify(state, null, 2); } catch (err) { rawBackup = null; }
         backup.value = rawBackup || JSON.stringify(state, null, 2); backup.select();
       }
     });
@@ -1382,22 +1691,22 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
             var restored = JSON.parse(reader.result);
             if (!valid(restored)) throw new Error('version');
             if (!win.confirm('통근 기록과 초안을 이 백업으로 바꿀까요? PC 기록은 유지됩니다. 현재 통근 백업을 먼저 보관하세요.')) return;
-            state = restored; readOnly = false; warning = ''; persist(); home();
-          } catch (err) { warning = '지원하는 v1 통근 백업이 아닙니다. 기존 기록은 유지했습니다.'; home(); }
+            state = migrate(restored); readOnly = false; warning = ''; persist(); home();
+          } catch (err) { warning = '지원하는 v1/v2 통근 백업이 아닙니다. 기존 기록은 유지했습니다.'; home(); }
         };
         reader.onerror = function () { warning = '파일을 읽지 못했습니다. 기존 기록은 유지했습니다.'; home(); };
         reader.readAsText(file);
       }
     });
     host.addEventListener('select', function (e) { if (e.target.id === 'cm-code') { snapshot(); persist(); } });
-    function flush() { snapshot(); if (active) persist(); }
+    function flush() { snapshot(); stop(); if (active) persist(); }
     win.addEventListener('pagehide', flush);
     doc.addEventListener('visibilitychange', function () { if (doc.hidden) flush(); });
     // No rerender on viewport resize: value, cursor, focus and undo survive rotation/keyboard resizing.
     return { show: function () { if (active && editor) return; home(); }, flush: flush,
-      backup: function () { try { return readOnly ? { preservedRaw: store.getItem(KEY) } : state; } catch (e) { return null; } } };
+      backup: function () { try { return readOnly ? { preservedRaw: preservedRaw } : state; } catch (e) { return null; } } };
   }
-  return { key: KEY, catalog: CATALOG, empty: empty, valid: valid, plan: plan, inspect: inspect, attach: attach };
+  return { key: KEY, legacyKey: LEGACY_KEY, catalog: CATALOG, empty: empty, valid: valid, migrate: migrate, plan: plan, inspect: inspect, attach: attach };
 });
 
 (function () {
@@ -4205,7 +4514,7 @@ document.addEventListener('click', function (e) {
     return;
   }
   if (a === 'copy-json') {
-    var data = JSON.stringify({ problems: S.problems, books: S.books, insights: S.insights, settings: S.settings, daily: S.daily, commute: COMMUTE ? COMMUTE.backup() : (function () { try { return JSON.parse(localStorage.getItem(window.AlgoCommute.key) || 'null'); } catch (e) { return null; } })() }, null, 2);
+    var data = JSON.stringify({ problems: S.problems, books: S.books, insights: S.insights, settings: S.settings, daily: S.daily, commute: COMMUTE ? COMMUTE.backup() : (function () { try { return JSON.parse(localStorage.getItem(window.AlgoCommute.key) || localStorage.getItem(window.AlgoCommute.legacyKey) || 'null'); } catch (e) { return null; } })() }, null, 2);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(data).then(function () { toast('JSON을 클립보드에 복사했습니다'); },
         function () { toast('복사에 실패했습니다'); });

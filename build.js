@@ -40,7 +40,7 @@ if (!js.includes(marker)) {
 }
 js = js.replace(marker, JSON.stringify(catalog));
 const commute = read('commute.js').replace('/*__COMMUTE_CATALOG__*/[]', JSON.stringify(JSON.parse(read('commute-catalog.json'))));
-js = read('commute-editor.js') + '\n' + commute + '\n' + js;
+js = read('commute-editor.js') + '\n' + read('python-runner.js') + '\n' + commute + '\n' + js;
 
 let html = read('index.html');
 if (!html.includes('<!--INJECT:STYLES-->') || !html.includes('<!--INJECT:SCRIPT-->')) {

@@ -35,3 +35,18 @@ jobs:
         with: { node-version: "22" }
       - run: npm install --no-audit --no-fund
       - run: npm test
+
+  python-browser:
+    name: Python 격리 실행 및 모바일 브라우저
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYODIDE_TEST_DIR: ${{ runner.temp }}/algo-python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node test/cache-python-runtime.js
+      - run: npm run test:python-browser
+      - run: npm run test:browser

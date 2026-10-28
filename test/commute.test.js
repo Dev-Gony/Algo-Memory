@@ -40,7 +40,7 @@ test('괄호 도구는 선택을 감싸고 내부 선택을 유지한다', () =>
   assert.deepEqual(E.token(E.state('abc', 1, 2), ':', false), E.state('a:c', 2));
 });
 test('복습 간격과 자가 확인 독립성은 명확한 규칙을 따른다', () => {
-  const a = { outcome: 'self-pass', hints: 0, solutionSeen: false, exposed: false };
+  const a = { outcome: 'passed', verified: true, hints: 0, solutionSeen: false, exposed: false };
   assert.deepEqual(C.plan({ stage: 0 }, a, '2026-01-31'), { stage: 1, due: '2026-02-01', independent: true });
   assert.equal(C.plan({ stage: 1 }, a, '2026-01-31').due, '2026-02-03');
   assert.equal(C.plan({ stage: 4 }, a, '2026-01-01').due, '2026-01-31');
@@ -51,7 +51,7 @@ test('복습 간격과 자가 확인 독립성은 명확한 규칙을 따른다'
 });
 test('새 저장 형식은 미래 버전과 손상 기록을 거부한다', () => {
   assert.ok(C.valid(C.empty()));
-  assert.ok(!C.valid({ ...C.empty(), version: 2 }));
+  assert.ok(!C.valid({ ...C.empty(), version: 99 }));
   assert.ok(!C.valid({ ...C.empty(), records: { x: { attempts: [null] } } }));
   assert.ok(!C.valid({ ...C.empty(), drafts: { x: { code: 3 } } }));
   assert.ok(!C.valid({ ...C.empty(), records: [] }));
@@ -60,7 +60,7 @@ function fixture(t, data) { const f = open({ storage: legacy, url: 'https://exam
 function begin(f, id = 'even-count') { f.click('[data-cm="open"][data-id="' + id + '"]'); return f.d.getElementById('cm-code'); }
 function put(f, code) { f.set('cm-code', code); const ta = f.d.getElementById('cm-code'); ta.setSelectionRange(code.length, code.length); return ta; }
 function local(f) { return JSON.parse(f.w.localStorage.getItem(C.key)); }
-function answer(f, code = 'def solution(values):\n    return sum(v % 2 == 0 for v in values)') { put(f, code); f.click('[data-cm="submit"]'); }
+function answer(f, code = 'def solution(values):\n    return sum(v % 2 == 0 for v in values)') { put(f, code); f.click('[data-cm="self-check"]'); }
 function input(f, ta, type, text, cancelable = true) {
   const e = new f.w.InputEvent('beforeinput', { inputType: type, data: text, bubbles: true, cancelable });
   ta.dispatchEvent(e);
@@ -73,7 +73,7 @@ test('통근 진입·문제 수·PC 기존 기록 보존', async t => {
   assert.equal(f.d.getElementById('landing').hidden, true);
   assert.equal(catalog.length, 10);
   assert.equal(f.d.querySelectorAll('.cm-question').length, 4);
-  assert.ok(f.d.querySelector('.cm-contract').textContent.includes('실행하지 않습니다'));
+  assert.ok(f.d.querySelector('.cm-contract').textContent.includes('Python 입력·출력 채점'));
   begin(f); answer(f); f.click('[data-cm="assess"][data-outcome="self-pass"]');
   assert.deepEqual(f.local(), legacy);
   assert.deepEqual(f.errors, []);
@@ -127,11 +127,11 @@ test('한 번에 힌트 하나·해설은 제출 뒤·다른 변수명은 정답
   f.click('[data-cm="assess"][data-outcome="self-pass"]');
   const a = local(f).records['even-count'].attempts[0]; assert.equal(a.hints, 2); assert.equal(a.independent, false); assert.equal(a.verified, false);
 });
-test('독립 자가 확인 2회는 난이도를 올리고 오답은 낮춘다', async t => {
+test('자가 확인은 실행 정답으로 승격하거나 난이도를 올리지 않는다', async t => {
   const f = fixture(t); await f.tick(); begin(f); answer(f); f.click('[data-cm="assess"][data-outcome="self-pass"]');
   assert.equal(local(f).records['even-count'].attempts[0].independent, true);
   f.click('[data-cm="open"][data-id="odd-sum"]'); answer(f, 'def solution(nums):\n    return sum(n for n in nums if n % 2)');
-  f.click('[data-cm="assess"][data-outcome="self-pass"]'); assert.equal(local(f).level, 2);
+  f.click('[data-cm="assess"][data-outcome="self-pass"]'); assert.equal(local(f).level, 1);
   f.click('[data-cm="open"][data-id="even-count"]'); answer(f); f.click('[data-cm="assess"][data-outcome="review"]');
   assert.equal(local(f).level, 1); assert.equal(local(f).records['even-count'].stage, 0);
 });
@@ -145,8 +145,8 @@ test('모범 풀이와 같은 날 재시도는 독립 정답으로 둔갑하지 
 test('제출 뒤 코드 수정은 재제출을 요구하고 중복 기록을 막는다', async t => {
   const f = fixture(t); await f.tick(); begin(f); answer(f); put(f, 'def solution(nums):\n    return 0');
   assert.equal(f.d.querySelector('[data-cm="assess"]'), null);
-  f.click('[data-cm="submit"]'); f.click('[data-cm="assess"][data-outcome="review"]');
-  f.click('[data-cm="submit"]'); assert.equal(local(f).records['even-count'].attempts.length, 1);
+  f.click('[data-cm="self-check"]'); f.click('[data-cm="assess"][data-outcome="review"]');
+  f.click('[data-cm="self-check"]'); assert.equal(local(f).records['even-count'].attempts.length, 1);
 });
 test('새로고침 후 초안·힌트·제출 상태와 복습 기록을 복원', async t => {
   const f = fixture(t); await f.tick(); const ta = begin(f); answer(f); f.click('[data-cm="hint"]');
@@ -201,4 +201,55 @@ test('파일 복원은 별도 통근 데이터만 바꾸고 취소/오류를 보
   f.w.confirm = () => false; await restore(JSON.stringify(incoming)); assert.equal(f.w.localStorage.getItem(C.key), null);
   f.w.confirm = () => true; await restore(JSON.stringify(incoming)); assert.equal(local(f).level, 3);
   await restore('{invalid'); assert.equal(local(f).level, 3); assert.deepEqual(f.local(), legacy);
+});
+function mockPython(f, status = 'passed') {
+  f.w.AlgoPython.create = () => ({ cancel() {}, run: async (_code, tests, _preserve, progress) => {
+    progress({ status: 'running' });
+    if (['network-error','load-error','timeout','syntax-error','runtime-error'].includes(status)) return { status, detail: 'test error' };
+    return { status, total: tests.length, passed: status === 'passed' ? tests.length : 0,
+      rows: tests.map((c, index) => ({ index, ok: status === 'passed', actual: JSON.stringify(c.want), mutated: false })) };
+  } });
+}
+async function execute(f) { f.click('[data-cm="submit"]'); await f.tick(50); }
+test('실행 통과만 검증 정답으로 기록하고 독립 2회에 난이도를 올린다', async t => {
+  const f = fixture(t); await f.tick(); mockPython(f); begin(f); put(f, 'def solution(nums):\n    return 0'); await execute(f);
+  let saved = local(f), a = saved.records['even-count'].attempts[0];
+  assert.equal(a.verified, true); assert.equal(a.method, 'python-tests'); assert.equal(a.independent, true); assert.equal(saved.records['even-count'].stage, 1);
+  f.click('[data-cm="open"][data-id="odd-sum"]'); put(f, 'def solution(nums):\n    return 0'); await execute(f);
+  assert.equal(local(f).level, 2); assert.ok(C.valid(local(f))); assert.deepEqual(f.local(), legacy);
+});
+test('힌트 후 실행 통과는 도움 기록이며 실패는 검증 통과로 저장하지 않는다', async t => {
+  const f = fixture(t); await f.tick(); mockPython(f); begin(f); f.click('[data-cm="hint"]'); put(f, 'def solution(nums):\n    return 0'); await execute(f);
+  assert.equal(local(f).records['even-count'].attempts[0].independent, false);
+  assert.equal(local(f).records['even-count'].attempts[0].verified, true);
+  const g = fixture(t); await g.tick(); mockPython(g, 'wrong-answer'); begin(g); put(g, 'def solution(nums):\n    return None'); await execute(g);
+  assert.equal(local(g).records['even-count'].attempts[0].outcome, 'wrong-answer');
+  assert.equal(local(g).records['even-count'].attempts[0].verified, false); assert.ok(C.valid(local(g)));
+});
+test('실행기 로딩·네트워크 실패는 오답으로 기록하지 않고 시간 초과는 별도 기록', async t => {
+  for (const status of ['network-error','load-error','timeout','syntax-error','runtime-error']) {
+    const f = fixture(t); await f.tick(); mockPython(f, status); begin(f); put(f, 'def solution(nums):\n    return 0'); await execute(f);
+    const attempts = local(f).records['even-count']?.attempts || [];
+    if (['network-error','load-error'].includes(status)) assert.equal(attempts.length, 0);
+    else { assert.equal(attempts[0].outcome, status); assert.equal(attempts[0].verified, false); }
+    assert.ok(C.valid(local(f))); assert.deepEqual(f.errors, []);
+  }
+});
+test('v1 원본을 보존하고 예전 자가 정답·복습 단계를 검증 완료로 승격하지 않는다', async t => {
+  const old = C.empty(); old.version = 1; old.consecutive = 1; old.records['even-count'] = { stage: 4, due: today(), attempts: [{
+    time: 1, day: today(), hints: 0, seconds: 10, solutionSeen: false, exposed: false, independent: true, outcome: 'self-pass', verified: false
+  }] };
+  const f = fixture(t, { commuteLegacy: old }); await f.tick(); begin(f);
+  assert.deepEqual(JSON.parse(f.w.localStorage.getItem(C.legacyKey)), old);
+  const migrated = local(f); assert.equal(migrated.version, 2); assert.equal(migrated.consecutive, 0);
+  assert.equal(migrated.records['even-count'].stage, 0); assert.equal(migrated.records['even-count'].legacyStage, 4);
+  assert.equal(migrated.records['even-count'].attempts[0].verified, false); assert.equal(migrated.records['even-count'].attempts[0].outcome, 'self-pass');
+});
+test('실행 결과 새로고침 복원과 재시도는 기록을 중복 추가하지 않는다', async t => {
+  const f = fixture(t); await f.tick(); mockPython(f); begin(f); put(f, 'def solution(nums):\n    return 0'); await execute(f);
+  await execute(f); assert.equal(local(f).records['even-count'].attempts.length, 1);
+  const g = fixture(t, { commute: local(f) }); await g.tick(); begin(g); assert.ok(g.d.getElementById('cm-feedback').textContent.includes('실행 테스트 통과'));
+  assert.equal(local(g).records['even-count'].attempts.length, 1);
+  mockPython(g); g.click('[data-cm="retry"]'); put(g, 'def solution(items):\n    return 0'); await execute(g);
+  assert.equal(local(g).records['even-count'].attempts.length, 2);
 });

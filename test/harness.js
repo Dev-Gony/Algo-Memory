@@ -11,7 +11,7 @@ function today() {
   return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 }
 
-function open({ storage, db, commute, url } = {}) {
+function open({ storage, db, commute, commuteLegacy, url } = {}) {
   const html = fs.readFileSync(BUILT, 'utf8');
   const errors = [];
   const vc = new VirtualConsole();
@@ -26,7 +26,8 @@ function open({ storage, db, commute, url } = {}) {
       w.confirm = () => true;
       w.Element.prototype.scrollIntoView = function () {};
       if (storage) w.localStorage.setItem('algo-memory:v1', JSON.stringify(storage));
-      if (commute !== undefined) w.localStorage.setItem('algo-memory:commute:v1', typeof commute === 'string' ? commute : JSON.stringify(commute));
+      if (commute !== undefined) w.localStorage.setItem('algo-memory:commute:v2', typeof commute === 'string' ? commute : JSON.stringify(commute));
+      if (commuteLegacy !== undefined) w.localStorage.setItem('algo-memory:commute:v1', typeof commuteLegacy === 'string' ? commuteLegacy : JSON.stringify(commuteLegacy));
       if (db) w.claude = { use: (n) => Promise.resolve(n === 'db' ? db : null) };
     }
   });

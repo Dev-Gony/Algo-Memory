@@ -2803,7 +2803,7 @@ document.addEventListener('click', function (e) {
     return;
   }
   if (a === 'copy-json') {
-    var data = JSON.stringify({ problems: S.problems, books: S.books, insights: S.insights, settings: S.settings, daily: S.daily, commute: COMMUTE ? COMMUTE.backup() : (function () { try { return JSON.parse(localStorage.getItem(window.AlgoCommute.key) || 'null'); } catch (e) { return null; } })() }, null, 2);
+    var data = JSON.stringify({ problems: S.problems, books: S.books, insights: S.insights, settings: S.settings, daily: S.daily, commute: COMMUTE ? COMMUTE.backup() : (function () { try { return JSON.parse(localStorage.getItem(window.AlgoCommute.key) || localStorage.getItem(window.AlgoCommute.legacyKey) || 'null'); } catch (e) { return null; } })() }, null, 2);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(data).then(function () { toast('JSON을 클립보드에 복사했습니다'); },
         function () { toast('복사에 실패했습니다'); });

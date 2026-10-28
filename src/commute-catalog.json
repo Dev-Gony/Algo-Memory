@@ -285,7 +285,8 @@
           0
         ]
       }
-    ]
+    ],
+    "preserveInput": true
   },
   {
     "id": "positive-filter",
@@ -348,7 +349,8 @@
           1
         ]
       }
-    ]
+    ],
+    "preserveInput": true
   },
   {
     "id": "char-count",
@@ -464,7 +466,8 @@
           4
         ]
       }
-    ]
+    ],
+    "preserveInput": true
   },
   {
     "id": "pair-sum",

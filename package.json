@@ -9,9 +9,10 @@
     "catalog": "python3 content/catalog3.py && python3 content/sql_catalog.py && node build.js",
     "serve": "node build.js && node test/serve.js",
     "content-eval": "node test/content-eval.js",
-    "lint": "node --check src/app.js && node --check src/commute-editor.js && node --check src/commute.js && node --check build.js",
+    "lint": "node --check src/app.js && node --check src/commute-editor.js && node --check src/commute.js && node --check build.js && node --check src/python-runner.js",
     "test:commute-catalog": "python test/commute_catalog_test.py",
-    "test:browser": "node build.js && node test/commute.browser.js"
+    "test:browser": "node build.js && node test/commute.browser.js",
+    "test:python-browser": "node test/runner.browser.js"
   },
   "devDependencies": {
     "jsdom": "^24.0.0",
